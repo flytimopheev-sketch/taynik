@@ -1,4 +1,4 @@
-//! Конфигурация приложения (~/.config/redpass/config.toml).
+//! Конфигурация приложения (~/.config/taynik/config.toml).
 
 use std::path::PathBuf;
 
@@ -15,6 +15,8 @@ pub struct Config {
     pub lock_on_minimize: bool,
     /// Очистка буфера обмена через N секунд.
     pub clipboard_clear_seconds: u64,
+    /// Тема оформления (ключ из ui::theme::THEMES).
+    pub theme: String,
 }
 
 impl Default for Config {
@@ -24,6 +26,7 @@ impl Default for Config {
             auto_lock_minutes: 5,
             lock_on_minimize: false,
             clipboard_clear_seconds: 45,
+            theme: "system".to_string(),
         }
     }
 }
@@ -34,7 +37,7 @@ fn config_path() -> PathBuf {
         .unwrap_or_else(|_| {
             dirs_home().join(".config")
         });
-    base.join("redpass").join("config.toml")
+    base.join("taynik").join("config.toml")
 }
 
 fn dirs_home() -> PathBuf {

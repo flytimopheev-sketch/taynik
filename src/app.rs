@@ -4,10 +4,9 @@ use gtk4::prelude::*;
 use gtk4::{self as gtk, gio};
 
 /// Идентификатор приложения (совпадает с .desktop и AppStream).
-pub const APP_ID: &str = "ru.redos.RedPass";
+pub const APP_ID: &str = "ru.taynik.Taynik";
 
-/// Создать gtk::Application с настройками (тёмная тема подхватывается
-/// автоматически через схему GTK color-scheme).
+/// Создать gtk::Application с настройками.
 pub fn build_application() -> gtk::Application {
     let app = gtk::Application::builder()
         .application_id(APP_ID)

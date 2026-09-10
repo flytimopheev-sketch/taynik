@@ -7,6 +7,7 @@ use gtk4 as gtk;
 use gtk4::gio;
 use gtk4::gio::prelude::*;
 use gtk4::glib;
+use gtk4::glib::ToVariant;
 use gtk4::prelude::*;
 
 use super::password_generator;
@@ -42,6 +43,8 @@ pub struct MainWindow {
     strength_l: gtk::Label,
     updated_l: gtk::Label,
     last_activity: Rc<Cell<i64>>,
+    /// Защита от повторной блокировки (иначе открывается второе окно).
+    locked: Cell<bool>,
 }
 
 impl MainWindow {
@@ -49,7 +52,7 @@ impl MainWindow {
         let app = parent.application();
 
         let window = gtk::Window::builder()
-            .title("RedPass")
+            .title("Тайник")
             .default_width(1000)
             .default_height(640)
             .build();
@@ -83,6 +86,7 @@ impl MainWindow {
             strength_l: gtk::Label::new(None),
             updated_l: gtk::Label::new(None),
             last_activity: Rc::new(Cell::new(glib::monotonic_time())),
+            locked: Cell::new(false),
         });
 
         m.setup_header();
@@ -142,6 +146,12 @@ impl MainWindow {
         view_menu.append(Some("Сортировать по названию"), Some("win.sort-title"));
         view_menu.append(Some("Сортировать по дате изменения"), Some("win.sort-updated"));
 
+        let theme_menu = gio::Menu::new();
+        for t in super::theme::THEMES {
+            theme_menu.append(Some(t.title), Some(&format!("win.theme::{}", t.key)));
+        }
+        view_menu.append_submenu(Some("Тема оформления"), &theme_menu);
+
         let help_menu = gio::Menu::new();
         help_menu.append(Some("О программе"), Some("win.about"));
 
@@ -167,6 +177,7 @@ impl MainWindow {
         add("new-entry", Box::new(|m| m.new_entry()));
         add("delete-entry", Box::new(|m| m.delete_entry()));
         add("lock", Box::new(|m| m.lock()));
+        add("autotype", Box::new(|m| m.autotype_selected()));
         add("quit", Box::new(|m| m.window.destroy()));
         add("create-db", Box::new(|m| {
             super::create_db_dialog::show_create(&m.window, m.state.clone());
@@ -179,7 +190,7 @@ impl MainWindow {
                 .transient_for(&m.window)
                 .build();
             let filter = gtk::FileFilter::new();
-            filter.set_name(Some("База RedPass (*.rpwm)"));
+            filter.set_name(Some("База Тайник (*.rpwm)"));
             filter.add_pattern("*.rpwm");
             chooser.add_filter(&filter);
             let win = m.window.clone();
@@ -209,10 +220,10 @@ impl MainWindow {
         add("about", Box::new(|m| {
             gtk::AboutDialog::builder()
                 .title("О программе")
-                .program_name("RedPass")
+                .program_name("Тайник")
                 .version("1.0.0")
-                .comments("Офлайн-менеджер паролей для РЕД ОС")
-                .license_type(gtk::License::Gpl30)
+                .comments("Офлайн-менеджер паролей")
+                .license_type(gtk::License::MitX11)
                 .modal(true)
                 .transient_for(&m.window)
                 .build()
@@ -222,6 +233,26 @@ impl MainWindow {
             m.search.grab_focus();
         }));
 
+        // Переключение темы оформления (Вид → Тема оформления).
+        let theme_action = gio::SimpleAction::new_stateful(
+            "theme",
+            Some(&glib::VariantTy::STRING),
+            &self.state.config.borrow().theme.clone().to_variant(),
+        );
+        {
+            let m = self.clone();
+            theme_action.connect_activate(move |a, param| {
+                let key = param
+                    .and_then(|v| v.str().map(|s| s.to_string()))
+                    .unwrap_or_default();
+                super::theme::apply(&key);
+                a.set_state(&key.to_variant());
+                m.state.config.borrow_mut().theme = key;
+                m.state.config.borrow().save();
+            });
+        }
+        group.add_action(&theme_action);
+
         self.window.insert_action_group("win", Some(&group));
 
         if let Some(app) = app {
@@ -229,6 +260,7 @@ impl MainWindow {
             app.set_accels_for_action("win.focus-search", &["<Ctrl>f"]);
             app.set_accels_for_action("win.quit", &["<Ctrl>q"]);
             app.set_accels_for_action("win.lock", &["<Ctrl>l"]);
+            app.set_accels_for_action("win.autotype", &["<Ctrl><Shift>v"]);
         }
     }
 }
@@ -303,19 +335,29 @@ impl MainWindow {
         form.attach(&self.fav_cb, 1, 7, 1, 1);
 
         // --- Кнопки ---
-        let btns = gtk::Box::builder()
-            .orientation(gtk::Orientation::Horizontal)
-            .spacing(8)
+        // FlowBox вместо горизонтального Box: кнопки переносятся на новую
+        // строку при узкой панели, поэтому «Удалить» никогда не обрезается.
+        let btns = gtk::FlowBox::builder()
+            .selection_mode(gtk::SelectionMode::None)
+            .activate_on_single_click(false)
+            .min_children_per_line(2)
+            .max_children_per_line(3)
+            .homogeneous(true)
+            .column_spacing(8)
+            .row_spacing(8)
             .margin_top(8)
+            .hexpand(true)
             .build();
         let btn_gen = gtk::Button::with_label("Сгенерировать");
         let btn_copy = gtk::Button::with_label("Копировать пароль");
+        let btn_autotype = gtk::Button::with_label("Автоввод");
         let btn_save = gtk::Button::with_label("Сохранить");
         let btn_cancel = gtk::Button::with_label("Отмена");
         let btn_delete = gtk::Button::with_label("Удалить");
         btn_save.add_css_class("suggested-action");
         btn_delete.add_css_class("destructive-action");
-        for b in [&btn_gen, &btn_copy, &btn_save, &btn_cancel, &btn_delete] {
+        for b in [&btn_gen, &btn_copy, &btn_autotype, &btn_save, &btn_cancel, &btn_delete] {
+            b.set_hexpand(true);
             btns.append(b);
         }
         // Индикатор стойкости пароля (обновляется в update_strength).
@@ -359,7 +401,7 @@ impl MainWindow {
         self.toast.set_halign(gtk::Align::Fill);
         self.toast.set_valign(gtk::Align::Start);
 
-        self.connect_signals(btn_gen, btn_copy, btn_save, btn_cancel, btn_delete);
+        self.connect_signals(btn_gen, btn_copy, btn_save, btn_cancel, btn_delete, btn_autotype);
     }
 
     fn wrap_frame(self: &Rc<Self>, w: &impl IsA<gtk::Widget>) -> gtk::Frame {
@@ -379,6 +421,7 @@ impl MainWindow {
         btn_save: gtk::Button,
         btn_cancel: gtk::Button,
         btn_delete: gtk::Button,
+        btn_autotype: gtk::Button,
     ) {
         {
             let m = self.clone();
@@ -413,6 +456,10 @@ impl MainWindow {
         {
             let m = self.clone();
             btn_copy.connect_clicked(move |_| m.copy_password());
+        }
+        {
+            let m = self.clone();
+            btn_autotype.connect_clicked(move |_| m.autotype_selected());
         }
         {
             let m = self.clone();
@@ -670,6 +717,19 @@ impl MainWindow {
         dialog.show();
     }
 
+    /// Автоввод логина и пароля выбранной записи в активное окно.
+    fn autotype_selected(self: &Rc<Self>) {
+        let username = self.username_e.text().to_string();
+        let password = self.password_e.text().to_string();
+        if password.is_empty() {
+            show_error(&self.window, "Сначала выберите запись — пароль пуст.");
+            return;
+        }
+        // Автоввод считается активностью: не даём сработать автоблокировке.
+        self.last_activity.set(glib::monotonic_time());
+        super::autotype::run(&username, &password);
+    }
+
     fn copy_password(self: &Rc<Self>) {
         let password = self.password_e.text().to_string();
         if password.is_empty() {
@@ -719,6 +779,13 @@ impl MainWindow {
 
     /// Заблокировать: сбросить ключ и потребовать мастер-пароль заново.
     pub fn lock(self: &Rc<Self>) {
+        // Защита от повторной блокировки: потеря фокуса окна (например, при
+        // открытии диалога мастер-пароля) или таймер могли вызвать lock()
+        // несколько раз — открывалось второе окно программы.
+        if self.locked.get() {
+            return;
+        }
+        self.locked.set(true);
         let path = self.state.db.borrow().as_ref().map(|db| db.path.clone());
         *self.state.db.borrow_mut() = None;
         self.clear_details();

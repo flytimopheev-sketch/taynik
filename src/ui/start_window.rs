@@ -9,7 +9,7 @@ use super::{create_db_dialog, prompt_unlock_and_open, SharedState};
 pub fn show(app: &gtk::Application, state: SharedState) {
     let window = gtk::ApplicationWindow::builder()
         .application(app)
-        .title("RedPass — Менеджер паролей")
+        .title("Тайник — Менеджер паролей")
         .default_width(420)
         .default_height(280)
         .resizable(false)
@@ -26,7 +26,7 @@ pub fn show(app: &gtk::Application, state: SharedState) {
         .build();
 
     let title = gtk::Label::builder()
-        .label("RedPass — Менеджер паролей")
+        .label("Тайник — Менеджер паролей")
         .css_classes(vec!["title-1"])
         .build();
     box_.append(&title);
@@ -81,7 +81,7 @@ fn open_existing(parent: &impl IsA<gtk::Window>, state: &SharedState) {
         .transient_for(parent)
         .build();
     let filter = gtk::FileFilter::new();
-    filter.set_name(Some("База RedPass (*.rpwm)"));
+    filter.set_name(Some("База Тайник (*.rpwm)"));
     filter.add_pattern("*.rpwm");
     chooser.add_filter(&filter);
     let state = state.clone();

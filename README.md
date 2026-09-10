@@ -1,11 +1,11 @@
-# RedPass — офлайн-менеджер паролей для РЕД ОС
+# Тайник — офлайн-менеджер паролей
 
 GTK4-приложение на Rust для локального хранения, генерации и использования
 паролей. Работает полностью офлайн: без облака, сети и телеметрии.
 
 ## Безопасность
 
-- База `.rpwm` — SQLite-файл; все чувствительные поля (название, логин,
+- Устройство `.rpwm` — SQLite-файл; все чувствительные поля (название, логин,
   пароль, URL, заметки, теги) хранятся зашифрованными BLOB (AES-256-GCM,
   уникальный 12-байтовый nonce на поле, формат `nonce || ciphertext || tag`).
 - Ключ шифрования выводится из мастер-пароля через **Argon2id**:
@@ -27,7 +27,7 @@ cargo build --release
 ## Запуск
 
 ```bash
-./target/release/redpass
+./target/release/taynik
 ```
 
 ## Горячие клавиши
@@ -38,6 +38,7 @@ cargo build --release
 | Ctrl+F | Фокус на поиск |
 | Ctrl+Q | Выход |
 | Ctrl+L | Заблокировать (закрыть базу) |
+| Ctrl+Shift+V | Автоввод логина и пароля в активное окно |
 
 ## Функции
 
@@ -47,12 +48,15 @@ cargo build --release
   сортировка по названию или дате изменения, избранное (★).
 - Генератор паролей: длина 8–64, наборы символов, исключение похожих
   символов, минимум цифр/спецсимволов, индикатор стойкости.
+- Автоввод логина/пароля в другие приложения (`xdotool`/`wtype`) по
+  горячим клавишам.
+- Темы оформления: система, светлая, тёмная, Nord, Dracula, Solarized.
 
 ## Установка (RPM для РЕД ОС 7/8)
 
 ```bash
-rpmbuild -bb packaging/redpass.spec
-sudo dnf install ~/rpmbuild/RPMS/x86_64/redpass-1.0.0-1.*.rpm
+rpmbuild -bb packaging/taynik.spec
+sudo dnf install ~/rpmbuild/RPMS/x86_64/taynik-1.0.0-1.*.rpm
 ```
 
 ### Установка на машину без интернета
@@ -67,22 +71,22 @@ sudo dnf install ~/rpmbuild/RPMS/x86_64/redpass-1.0.0-1.*.rpm
 ```bash
 ./packaging/make-source-tarball.sh
 mkdir -p ~/rpmbuild/SOURCES
-cp redpass-1.0.0.tar.gz ~/rpmbuild/SOURCES/
+cp taynik-1.0.0.tar.gz ~/rpmbuild/SOURCES/
 ```
 
 Перенести каталог `rpmbuild` на офлайн-машину, затем:
 
 ```bash
-rpmbuild -bb packaging/redpass.spec
-sudo dnf install ~/rpmbuild/RPMS/x86_64/redpass-1.0.0-1.*.rpm
+rpmbuild -bb packaging/taynik.spec
+sudo dnf install ~/rpmbuild/RPMS/x86_64/taynik-1.0.0-1.*.rpm
 ```
 
 При необходимости обновить вендор: `cargo vendor vendor` (на машине
 с интернетом), следуя выводимой инструкции для `.cargo/config.toml`.
 
-Устанавливается: `/usr/bin/redpass`, `/usr/share/applications/redpass.desktop`,
-`/usr/share/icons/hicolor/scalable/apps/redpass.svg`,
-`/usr/share/metainfo/redpass.metainfo.xml`.
+Устанавливается: `/usr/bin/taynik`, `/usr/share/applications/taynik.desktop`,
+`/usr/share/icons/hicolor/scalable/apps/taynik.svg`,
+`/usr/share/metainfo/taynik.metainfo.xml`.
 
 ## Структура
 
@@ -93,7 +97,7 @@ src/
   models/  entry.rs, generator.rs
   ui/      start_window, unlock_dialog, create_db_dialog, main_window,
            password_generator
-packaging/ redpass.spec (RPM), desktop/metainfo, make-source-tarball.sh
+packaging/ taynik.spec (RPM), desktop/metainfo, make-source-tarball.sh
 .github/   workflows/build-rpm.yml (сборка RPM в GitHub Actions)
 vendor/    вендоренные Rust-зависимости (сборка без интернета)
 ```

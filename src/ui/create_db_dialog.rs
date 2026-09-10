@@ -65,7 +65,7 @@ pub fn show_create(parent: &impl IsA<gtk::Window>, state: SharedState) {
                 .transient_for(&dialog)
                 .build();
             let filter = gtk::FileFilter::new();
-            filter.set_name(Some("База RedPass (*.rpwm)"));
+            filter.set_name(Some("База Тайник (*.rpwm)"));
             filter.add_pattern("*.rpwm");
             chooser.add_filter(&filter);
             chooser.set_current_name("passwords.rpwm");

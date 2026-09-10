@@ -1,10 +1,10 @@
 [Desktop Entry]
 Type=Application
-Name=RedPass — Менеджер паролей
+Name=Тайник — Менеджер паролей
 GenericName=Менеджер паролей
 Comment=Офлайн-хранение и генерация паролей
-Exec=redpass %U
-Icon=redpass
+Exec=taynik %U
+Icon=taynik
 Terminal=false
 Categories=Utility;Security;
 Keywords=password;пароль;safe;сейф;

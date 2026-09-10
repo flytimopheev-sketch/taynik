@@ -1,9 +1,11 @@
 //! Модуль пользовательского интерфейса (GTK4).
 
+pub mod autotype;
 pub mod create_db_dialog;
 pub mod main_window;
 pub mod password_generator;
 pub mod start_window;
+pub mod theme;
 pub mod unlock_dialog;
 
 use std::cell::RefCell;
@@ -24,12 +26,14 @@ pub struct AppState {
 
 pub type SharedState = Rc<AppState>;
 
-pub const APP_ID: &str = "ru.redos.RedPass";
+pub const APP_ID: &str = "ru.taynik.Taynik";
 
 pub fn run() {
     let app = gtk::Application::builder().application_id(APP_ID).build();
     app.connect_activate(|app| {
         let config = Config::load();
+        // Применяем сохранённую тему до создания окон.
+        theme::apply(&config.theme);
         let state: SharedState = Rc::new(AppState {
             db: Rc::new(RefCell::new(None)),
             config: Rc::new(RefCell::new(config)),

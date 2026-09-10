@@ -6,7 +6,7 @@ use gtk4 as gtk;
 use gtk4::prelude::*;
 
 /// Показать диалог ввода мастер-пароля; `on_ok` вызывается с введённым паролем.
-pub fn show(parent: &impl IsA<gtk::Window>, path: &Path, on_ok: impl FnOnce(gtk::Window, String) + 'static) {
+pub fn show(parent: &impl IsA<gtk::Window>, _path: &Path, on_ok: impl FnOnce(gtk::Window, String) + 'static) {
     let dialog = gtk::Dialog::builder()
         .title("Введите мастер-пароль")
         .modal(true)
@@ -26,12 +26,6 @@ pub fn show(parent: &impl IsA<gtk::Window>, path: &Path, on_ok: impl FnOnce(gtk:
         .margin_start(16)
         .margin_end(16)
         .build();
-
-    let file_label = gtk::Label::builder()
-        .label(format!("Файл: {}", path.display()))
-        .ellipsize(gtk::pango::EllipsizeMode::Middle)
-        .build();
-    box_.append(&file_label);
 
     let entry = gtk::PasswordEntry::builder()
         .show_peek_icon(true)
