@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>ru.redos.RedPass</id>
+  <name>RedPass</name>
+  <summary>Офлайн-менеджер паролей</summary>
+  <name xml:lang="ru">RedPass — Менеджер паролей</name>
+  <summary xml:lang="ru">Безопасное локальное хранение паролей</summary>
+  <description>
+    <p>RedPass — офлайн-менеджер паролей для РЕД ОС. База хранится локально
+    в зашифрованном виде (AES-256-GCM, ключ выводится из мастер-пароля
+    через Argon2id). Работает без сети, облака и телеметрии.</p>
+    <p>Возможности: генератор стойких паролей, поиск и фильтр по тегам,
+    копирование пароля с автоочисткой буфера обмена, автоблокировка,
+    резервное копирование базы.</p>
+  </description>
+  <launchable type="desktop-id">redpass.desktop</launchable>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <content_rating type="oars-1.1"/>
+  <provides>
+    <binary>redpass</binary>
+  </provides>
+</component>

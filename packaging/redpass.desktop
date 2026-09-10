@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=RedPass — Менеджер паролей
+GenericName=Менеджер паролей
+Comment=Офлайн-хранение и генерация паролей
+Exec=redpass %U
+Icon=redpass
+Terminal=false
+Categories=Utility;Security;
+Keywords=password;пароль;safe;сейф;
+StartupNotify=true
+MimeType=application/x-redpass;

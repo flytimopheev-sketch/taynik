@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- RedPass icon: red shield with a keyhole -->
+  <defs>
+    <linearGradient id="red" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e0312f"/>
+      <stop offset="1" stop-color="#a01818"/>
+    </linearGradient>
+  </defs>
+  <path d="M64 8 L112 24 V60 C112 92 92 110 64 120 C36 110 16 92 16 60 V24 Z"
+        fill="url(#red)" stroke="#7a1010" stroke-width="4"/>
+  <circle cx="64" cy="56" r="14" fill="#fff"/>
+  <rect x="58" y="60" width="12" height="30" rx="4" fill="#fff"/>
+</svg>

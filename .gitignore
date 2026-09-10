@@ -1,0 +1,11 @@
+# Rust / Cargo
+/target/
+**/*.rs.bk
+
+# Собранные артефакты
+*.tar.gz
+*.rpm
+
+# Логи и временные файлы
+errors.txt
+*.log

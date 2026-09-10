@@ -1,0 +1,51 @@
+name: build-rpm
+
+# Сборка RPM-пакета в контейнере Fedora прямо на GitHub.
+# Готовый .rpm появляется в артефактах запуска, а на тегах вида v*
+# дополнительно публикуется в GitHub Release.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  rpm:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:41
+    steps:
+      - name: Установка зависимостей
+        run: |
+          dnf -y install rpm-build rust cargo gcc pkgconfig gtk4-devel tar gzip findutils
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Сборка исходного tarball (с vendored-зависимостями)
+        run: ./packaging/make-source-tarball.sh
+
+      - name: Сборка RPM
+        run: |
+          mkdir -p "$HOME/rpmbuild/SOURCES"
+          cp redpass-1.0.0.tar.gz "$HOME/rpmbuild/SOURCES/"
+          rpmbuild -bb packaging/redpass.spec
+
+      - name: Копирование артефактов
+        run: |
+          mkdir -p dist
+          find "$HOME/rpmbuild/RPMS" -name '*.rpm' -exec cp {} dist/ \;
+          ls -l dist
+
+      - name: Upload RPM (артефакт)
+        uses: actions/upload-artifact@v4
+        with:
+          name: redpass-rpm
+          path: dist/*.rpm
+          if-no-files-found: error
+
+      - name: GitHub Release (только для тегов v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.rpm
