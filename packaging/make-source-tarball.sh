@@ -5,8 +5,8 @@ set -e
 cd "$(dirname "$0")/.."
 # tarball не должен содержать артефакты сборки
 tar --exclude='target' --exclude='.git' \
+    --transform 's,^,redpass-1.0.0/,' \
     -czf "redpass-1.0.0.tar.gz" \
-    -s '/^/redpass-1.0.0\//' \
     Cargo.toml Cargo.lock LICENSE README.md \
     src packaging resources .cargo vendor
 echo "OK: $(pwd)/redpass-1.0.0.tar.gz"

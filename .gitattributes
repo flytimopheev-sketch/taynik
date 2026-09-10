@@ -1,7 +1,3 @@
-# Запрет преобразования EOL в vendored-зависимостях:
-# иначе на Windows-клоне (autocrlf) сломаются .cargo-checksum.json.
-vendor/** -text
-
 # Исходники проекта — LF.
 *.rs   text eol=lf
 *.toml text eol=lf
@@ -10,4 +6,11 @@ vendor/** -text
 *.sh   text eol=lf
 *.spec text eol=lf
 *.xml  text eol=lf
+*.json text eol=lf
+*.desktop text eol=lf
+*.svg  text eol=lf
 LICENSE text eol=lf
+
+# Запрет преобразования EOL в vendored-зависимостях (последняя строка
+# выигрывает): иначе на Windows-клоне сломаются .cargo-checksum.json.
+vendor/** -text
