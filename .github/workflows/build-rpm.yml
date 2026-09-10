@@ -23,7 +23,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Сборка исходного tarball (с vendored-зависимостями)
-        run: ./packaging/make-source-tarball.sh
+        run: sh packaging/make-source-tarball.sh
 
       - name: Сборка RPM
         run: |
