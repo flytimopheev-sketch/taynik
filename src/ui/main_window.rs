@@ -7,7 +7,6 @@ use gtk4 as gtk;
 use gtk4::gio;
 use gtk4::gio::prelude::*;
 use gtk4::glib;
-use gtk4::glib::ToVariant;
 use gtk4::prelude::*;
 
 use super::password_generator;
@@ -237,10 +236,11 @@ impl MainWindow {
         }));
 
         // Переключение темы оформления (Вид → Тема оформления).
+        let theme = self.state.config.borrow().theme.clone();
         let theme_action = gio::SimpleAction::new_stateful(
             "theme",
             Some(&glib::VariantTy::STRING),
-            &self.state.config.borrow().theme.clone().to_variant(),
+            &glib::Variant::from(theme.as_str()),
         );
         {
             let m = self.clone();
@@ -249,7 +249,7 @@ impl MainWindow {
                     .and_then(|v| v.str().map(|s| s.to_string()))
                     .unwrap_or_default();
                 super::theme::apply(&key);
-                a.set_state(&key.to_variant());
+                a.set_state(&glib::Variant::from(key.as_str()));
                 m.state.config.borrow_mut().theme = key;
                 m.state.config.borrow().save();
             });
@@ -361,8 +361,13 @@ impl MainWindow {
         btn_delete.add_css_class("destructive-action");
         for b in [&btn_gen, &btn_copy, &btn_autotype, &btn_save, &btn_cancel, &btn_delete] {
             b.set_hexpand(true);
-            btns.append(b);
         }
+        btns.insert(&btn_gen, -1);
+        btns.insert(&btn_copy, -1);
+        btns.insert(&btn_autotype, -1);
+        btns.insert(&btn_save, -1);
+        btns.insert(&btn_cancel, -1);
+        btns.insert(&btn_delete, -1);
         // Индикатор стойкости пароля (обновляется в update_strength).
         self.strength_l.set_halign(gtk::Align::Start);
         form.attach(&self.strength_l, 1, 8, 1, 1);

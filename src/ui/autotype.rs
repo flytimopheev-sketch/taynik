@@ -16,6 +16,9 @@ pub fn run(username: &str, password: &str) {
     if username.is_empty() && password.is_empty() {
         return;
     }
+    // Клонируем в owned, т.к. используется внутри замыкания таймера.
+    let username = username.to_string();
+    let password = password.to_string();
 
     let win = gtk::Window::builder()
         .title("Тайник — автоввод")
@@ -24,7 +27,6 @@ pub fn run(username: &str, password: &str) {
         .resizable(false)
         .decorated(false)
         .build();
-    win.set_keep_above(true);
     let label = gtk::Label::new(Some("Переключитесь в целевое окно…"));
     label.set_margin_top(24);
     label.set_margin_bottom(24);
@@ -38,7 +40,7 @@ pub fn run(username: &str, password: &str) {
         let r = remaining.get();
         if r == 0 {
             win.destroy();
-            type_sequence(username, password);
+            type_sequence(username.as_str(), password.as_str());
             return glib::ControlFlow::Break;
         }
         remaining.set(r - 1);

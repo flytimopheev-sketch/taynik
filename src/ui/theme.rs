@@ -4,7 +4,6 @@ use std::cell::RefCell;
 
 use gtk4 as gtk;
 use gtk4::gdk;
-use gtk4::prelude::*;
 
 /// Описание одной темы.
 pub struct Theme {
@@ -39,12 +38,12 @@ pub fn apply(key: &str) {
     CURRENT.with(|cell| {
         let mut cur = cell.borrow_mut();
         if let Some(old) = cur.take() {
-            gtk::StyleContext::remove_provider_for_display(&display, &old);
+            gtk::style_context_remove_provider_for_display(&display, &old);
         }
         if let Some(css) = css_for(key) {
             let provider = gtk::CssProvider::new();
-            provider.load_from_data(css.as_bytes()).ok();
-            gtk::StyleContext::add_provider_for_display(
+            provider.load_from_data(css.as_str());
+            gtk::style_context_add_provider_for_display(
                 &display,
                 &provider,
                 gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
