@@ -48,9 +48,10 @@ jobs:
           git checkout --orphan ci-debug
           git reset --hard
           git rm -rf --cached . -q 2>/dev/null || true
-          git add rpmbuild.log rpm-requires.txt 2>/dev/null || true
+          git add rpmbuild.log 2>/dev/null || true
+          git add rpm-requires.txt 2>/dev/null || true
           git commit -m "rpmbuild log $VER" || true
-          git push -f origin ci-debug
+          git push -f origin ci-debug || true
 
       - name: Копирование артефактов
         run: |
