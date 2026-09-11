@@ -27,8 +27,10 @@ Requires:       gtk4 >= 4.10
 %build
 # В CI установлен cargo-zigbuild — собираем с целевой glibc 2.17, чтобы
 # бинарник работал на РЕД ОС 7/8 (glibc 2.17/2.28) и новее.
-if command -v cargo-zigbuild >/dev/null 2>&1; then
-    cargo-zigbuild build --release --offline --locked --target x86_64-unknown-linux-gnu.2.17
+ZB=$(command -v cargo-zigbuild || true)
+[ -n "$ZB" ] || ZB="$HOME/.local/bin/cargo-zigbuild"
+if [ -x "$ZB" ]; then
+    "$ZB" build --release --offline --locked --target x86_64-unknown-linux-gnu.2.17
 else
     echo "cargo-zigbuild не найден — сборка с системной glibc" >&2
     cargo build --release --offline --locked
