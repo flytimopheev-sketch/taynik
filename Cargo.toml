@@ -5,6 +5,8 @@ edition = "2021"
 description = "Тайник — офлайн-менеджер паролей"
 license = "MIT"
 
+build = "src/build.rs"
+
 [dependencies]
 gtk4 = "0.9"
 glib = "0.20"
