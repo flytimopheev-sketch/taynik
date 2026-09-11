@@ -16,8 +16,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y rpm pkg-config libgtk-4-dev gcc
-          pip3 install cargo-zigbuild ziglang
+          pip3 install cargo-zigbuild ziglang || pip3 install --break-system-packages cargo-zigbuild ziglang
           echo "$HOME/.local/bin" >> $GITHUB_PATH
+          command -v zig || echo "zig NOT FOUND" >&2
+          command -v cargo-zigbuild || echo "cargo-zigbuild NOT FOUND" >&2
+          cargo zigbuild --version
 
       - name: Checkout
         uses: actions/checkout@v4

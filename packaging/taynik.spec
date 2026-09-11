@@ -1,5 +1,5 @@
 Name:           taynik
-Version:        1.0.2
+Version:        1.0.3
 Release:        1%{?dist}
 Summary:        Офлайн-менеджер паролей
 License:        MIT
@@ -25,11 +25,12 @@ Requires:       gtk4 >= 4.10
 # Все зависимости Rust уже в vendor/ (см. .cargo/config.toml),
 # сеть при сборке не требуется.
 %build
-# Если установлен cargo-zigbuild — собираем с целевой старой glibc (2.17),
-# чтобы бинарник работал на РЕД ОС 7/8 (glibc 2.17/2.28) и новее.
-if cargo zigbuild --version >/dev/null 2>&1; then
-    cargo zigbuild --release --offline --locked --target x86_64-unknown-linux-gnu.2.17
+# В CI установлен cargo-zigbuild — собираем с целевой glibc 2.17, чтобы
+# бинарник работал на РЕД ОС 7/8 (glibc 2.17/2.28) и новее.
+if command -v cargo-zigbuild >/dev/null 2>&1; then
+    cargo-zigbuild build --release --offline --locked --target x86_64-unknown-linux-gnu.2.17
 else
+    echo "cargo-zigbuild не найден — сборка с системной glibc" >&2
     cargo build --release --offline --locked
 fi
 
@@ -50,6 +51,11 @@ install -Dm644 packaging/taynik.metainfo.xml %{buildroot}%{_metainfodir}/taynik.
 %{_metainfodir}/taynik.metainfo.xml
 
 %changelog
+* Fri Sep 11 2026 Taynik Maintainer <maintainer@local> - 1.0.3-1
+- Исправлена сборка с cargo-zigbuild (раньше она незаметно откатывалась
+  на системный cargo, и требование GLIBC_2.39 оставалось).
+- Из исходников убраны упоминания прежнего имени проекта.
+
 * Fri Sep 11 2026 Taynik Maintainer <maintainer@local> - 1.0.2-1
 - RPM-сборка через cargo-zigbuild с целевой glibc 2.17: бинарник работает
   на РЕД ОС 7/8 и новее (раньше требовалась glibc 2.39 из ubuntu-24.04).

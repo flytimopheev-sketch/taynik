@@ -59,14 +59,14 @@ cargo build --release
 [Releases](https://github.com/flytimopheev-sketch/taynik/releases) на тегах `v*`.
 
 ```bash
-sudo dnf install ./taynik-1.0.2-1.*.rpm
+sudo dnf install ./taynik-1.0.3-1.*.rpm
 ```
 
 ### Сборка RPM вручную
 
 ```bash
 rpmbuild -bb packaging/taynik.spec
-sudo dnf install ~/rpmbuild/RPMS/x86_64/taynik-1.0.2-1.*.rpm
+sudo dnf install ~/rpmbuild/RPMS/x86_64/taynik-1.0.3-1.*.rpm
 ```
 
 ### Установка на машину без интернета
@@ -81,14 +81,14 @@ sudo dnf install ~/rpmbuild/RPMS/x86_64/taynik-1.0.2-1.*.rpm
 ```bash
 ./packaging/make-source-tarball.sh
 mkdir -p ~/rpmbuild/SOURCES
-cp taynik-1.0.2.tar.gz ~/rpmbuild/SOURCES/
+cp taynik-1.0.3.tar.gz ~/rpmbuild/SOURCES/
 ```
 
 Перенести каталог `rpmbuild` на офлайн-машину, затем:
 
 ```bash
 rpmbuild -bb packaging/taynik.spec
-sudo dnf install ~/rpmbuild/RPMS/x86_64/taynik-1.0.2-1.*.rpm
+sudo dnf install ~/rpmbuild/RPMS/x86_64/taynik-1.0.3-1.*.rpm
 ```
 
 При необходимости обновить вендор: `cargo vendor vendor` (на машине
