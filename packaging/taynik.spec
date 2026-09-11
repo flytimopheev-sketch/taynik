@@ -1,6 +1,6 @@
 Name:           taynik
 Version:        1.0.3
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Офлайн-менеджер паролей
 License:        MIT
 URL:            https://github.com/flytimopheev-sketch/taynik
@@ -8,6 +8,7 @@ Source0:        %{name}-%{version}.tar.gz
 BuildRequires:  rust
 BuildRequires:  cargo
 BuildRequires:  gcc
+BuildRequires:  binutils
 BuildRequires:  pkgconfig
 BuildRequires:  gtk4-devel >= 4.10
 Requires:       gtk4 >= 4.10
@@ -25,16 +26,29 @@ Requires:       gtk4 >= 4.10
 # Все зависимости Rust уже в vendor/ (см. .cargo/config.toml),
 # сеть при сборке не требуется.
 %build
-# В CI установлен cargo-zigbuild — собираем с целевой glibc 2.17, чтобы
-# бинарник работал на РЕД ОС 7/8 (glibc 2.17/2.28) и новее.
-ZB=$(command -v cargo-zigbuild || true)
+# Сборка строго через cargo-zigbuild с целевой glibc 2.17, чтобы бинарник
+# работал на РЕД ОС 7/8 (glibc 2.17/2.28) и новее. Никаких "мягких" откатов:
+# линковка с системной glibc раннера даёт требование GLIBC_2.39 и ломает
+# установку на РЕД ОС.
+ZB="$(command -v cargo-zigbuild || true)"
 [ -n "$ZB" ] || ZB="$HOME/.local/bin/cargo-zigbuild"
-if [ -x "$ZB" ]; then
-    RUSTFLAGS="-L /usr/lib/x86_64-linux-gnu -C link-arg=-Wl,--defsym=fcntl64=fcntl -C link-arg=-Wl,--allow-shlib-undefined" "$ZB" build --release --offline --locked --target x86_64-unknown-linux-gnu.2.17
-else
-    echo "cargo-zigbuild не найден — сборка с системной glibc" >&2
-    cargo build --release --offline --locked
+if [ ! -x "$ZB" ]; then
+    echo "ОШИБКА: cargo-zigbuild не найден — сборка с системной glibc недопустима" >&2
+    exit 1
 fi
+# ВАЖНО: не задавать RUSTFLAGS с -L на системную glibc — иначе линковщик
+# возьмёт символы из системной glibc и требование GLIBC_2.39 вернётся.
+RUSTFLAGS="" "$ZB" build --release --offline --locked --target x86_64-unknown-linux-gnu.2.17
+
+%check
+# Контроль: бинарник не должен требовать символы glibc новее 2.17.
+BIN=target/x86_64-unknown-linux-gnu/release/taynik
+MAXSYM=$(objdump -T "$BIN" 2>/dev/null | grep -o 'GLIBC_2\.[0-9]*' | sort -uV | tail -n1 || true)
+echo "Максимальная версия GLIBC-символов: ${MAXSYM:-none}"
+case "$MAXSYM" in
+    GLIBC_2\.[0-9]|GLIBC_2\.1[0-7]) ;; # 2.0..2.17 — допустимо
+    *) echo "ОШИБКА: бинарник требует $MAXSYM (допустимо не выше GLIBC_2.17)" >&2; exit 1 ;;
+esac
 
 %install
 BIN=target/release/taynik
@@ -53,6 +67,13 @@ install -Dm644 packaging/taynik.metainfo.xml %{buildroot}%{_metainfodir}/taynik.
 %{_metainfodir}/taynik.metainfo.xml
 
 %changelog
+* Fri Sep 11 2026 Taynik Maintainer <maintainer@local> - 1.0.3-2
+- Убраны RUSTFLAGS с -L на системную glibc (именно из-за них бинарник
+  требовал GLIBC_2.39 даже при сборке через cargo-zigbuild).
+- cargo-zigbuild теперь обязателен: при его отсутствии сборка падает,
+  а не тихо откатывается на системный cargo.
+- Добавлена проверка %check: сборка падает, если бинарник требует
+  символы glibc новее 2.17.
 * Fri Sep 11 2026 Taynik Maintainer <maintainer@local> - 1.0.3-1
 - Исправлена сборка с cargo-zigbuild (раньше она незаметно откатывалась
   на системный cargo, и требование GLIBC_2.39 оставалось).
