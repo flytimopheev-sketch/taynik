@@ -1,5 +1,5 @@
 Name:           taynik
-Version:        1.0.1
+Version:        1.0.2
 Release:        1%{?dist}
 Summary:        Офлайн-менеджер паролей
 License:        MIT
@@ -25,10 +25,18 @@ Requires:       gtk4 >= 4.10
 # Все зависимости Rust уже в vendor/ (см. .cargo/config.toml),
 # сеть при сборке не требуется.
 %build
-cargo build --release --offline --locked
+# Если установлен cargo-zigbuild — собираем с целевой старой glibc (2.17),
+# чтобы бинарник работал на РЕД ОС 7/8 (glibc 2.17/2.28) и новее.
+if cargo zigbuild --version >/dev/null 2>&1; then
+    cargo zigbuild --release --offline --locked --target x86_64-unknown-linux-gnu.2.17
+else
+    cargo build --release --offline --locked
+fi
 
 %install
-install -Dm755 target/release/taynik %{buildroot}%{_bindir}/taynik
+BIN=target/release/taynik
+[ -x "$BIN" ] || BIN=target/x86_64-unknown-linux-gnu/release/taynik
+install -Dm755 "$BIN" %{buildroot}%{_bindir}/taynik
 install -Dm644 packaging/taynik.desktop %{buildroot}%{_datadir}/applications/taynik.desktop
 install -Dm644 resources/icons/taynik.svg %{buildroot}%{_datadir}/icons/hicolor/scalable/apps/taynik.svg
 install -Dm644 packaging/taynik.metainfo.xml %{buildroot}%{_metainfodir}/taynik.metainfo.xml
@@ -42,6 +50,10 @@ install -Dm644 packaging/taynik.metainfo.xml %{buildroot}%{_metainfodir}/taynik.
 %{_metainfodir}/taynik.metainfo.xml
 
 %changelog
+* Fri Sep 11 2026 Taynik Maintainer <maintainer@local> - 1.0.2-1
+- RPM-сборка через cargo-zigbuild с целевой glibc 2.17: бинарник работает
+  на РЕД ОС 7/8 и новее (раньше требовалась glibc 2.39 из ubuntu-24.04).
+
 * Fri Sep 11 2026 Taynik Maintainer <maintainer@local> - 1.0.1-1
 - Сборка RPM напрямую в GitHub Actions (ubuntu-latest, без docker-контейнера).
 - Исправлен MimeType в taynik.desktop (application/x-taynik).
