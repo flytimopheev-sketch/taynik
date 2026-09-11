@@ -1,6 +1,6 @@
 //! Схема базы данных. Все чувствительные поля хранятся зашифрованными BLOB.
 
-pub const SCHEMA_VERSION: i64 = 1;
+pub const SCHEMA_VERSION: i64 = 2;
 
 /// Открытый текст, которым проверяется корректность мастер-пароля.
 pub const VERIFIER_PLAINTEXT: &str = "taynik-verifier-v1";
@@ -31,7 +31,28 @@ CREATE TABLE IF NOT EXISTS entries (
     notes BLOB,
     tags BLOB,
     favorite INTEGER NOT NULL DEFAULT 0,
+    entry_group BLOB,
+    color BLOB,
+    totp BLOB,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS entry_history (
+    id INTEGER PRIMARY KEY,
+    entry_id INTEGER NOT NULL,
+    password BLOB NOT NULL,
+    changed_at INTEGER NOT NULL
+);
+";
+
+/// Миграция существующей базы до текущей версии схемы.
+/// Выполняется после успешной расшифровки verifier (мастер-пароль верен).
+pub const MIGRATE_V2: &str = "
+CREATE TABLE IF NOT EXISTS entry_history (
+    id INTEGER PRIMARY KEY,
+    entry_id INTEGER NOT NULL,
+    password BLOB NOT NULL,
+    changed_at INTEGER NOT NULL
 );
 ";

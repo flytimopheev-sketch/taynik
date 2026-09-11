@@ -11,6 +11,12 @@ pub struct Entry {
     pub notes: String,
     pub tags: Vec<String>,
     pub favorite: bool,
+    /// Группа (папка), к которой относится запись.
+    pub group: String,
+    /// Цветовая метка (HEX, например #e74c3c; пусто — без метки).
+    pub color: String,
+    /// TOTP-секрет в base32 (пусто — TOTP не задан).
+    pub totp_secret: String,
     pub created_at: i64,
     pub updated_at: i64,
 }

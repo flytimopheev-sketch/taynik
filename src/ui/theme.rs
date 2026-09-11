@@ -40,6 +40,15 @@ pub fn apply(key: &str) {
         if let Some(old) = cur.take() {
             gtk::style_context_remove_provider_for_display(&display, &old);
         }
+        // Базовый CSS применяется всегда (и для системной темы тоже):
+        // единые скругления полей ввода и панелей, как у главного окна.
+        let base = gtk::CssProvider::new();
+        base.load_from_data(BASE_CSS);
+        gtk::style_context_add_provider_for_display(
+            &display,
+            &base,
+            gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+        );
         if let Some(css) = css_for(key) {
             let provider = gtk::CssProvider::new();
             provider.load_from_data(css.as_str());
@@ -52,6 +61,19 @@ pub fn apply(key: &str) {
         }
     });
 }
+
+/// Базовые переопределения (скругления), применяются для любой темы.
+const BASE_CSS: &str = "
+entry, spinbutton, textview, combobox button.combo {
+    border-radius: 10px;
+}
+searchbar entry {
+    border-radius: 10px;
+}
+frame > border, .card {
+    border-radius: 12px;
+}
+";
 
 /// CSS для ключа темы; None — использовать системную тему без переопределений.
 fn css_for(key: &str) -> Option<String> {

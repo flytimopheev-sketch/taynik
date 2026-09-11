@@ -1,9 +1,8 @@
 Name:           taynik
-Version:        1.0.3
+Version:        1.1.0
 Release:        2%{?dist}
 Summary:        Офлайн-менеджер паролей
 License:        MIT
-URL:            https://github.com/flytimopheev-sketch/taynik
 Source0:        %{name}-%{version}.tar.gz
 BuildRequires:  rust
 BuildRequires:  cargo
@@ -78,26 +77,35 @@ install -Dm644 packaging/taynik.metainfo.xml %{buildroot}%{_metainfodir}/taynik.
 %{_metainfodir}/taynik.metainfo.xml
 
 %changelog
-* Fri Sep 11 2026 Taynik Maintainer <maintainer@local> - 1.0.3-2
+* Fri Sep 11 2026 flytimopheev <flytimopheev@gmail.com> - 1.1.0-1
+- Новое: настраиваемая последовательность автоввода ({USERNAME}{TAB}{PASSWORD}
+  и произвольные токены) и диалог настроек.
+- Новое: TOTP-коды по base32-секрету записи, история паролей с восстановлением.
+- Новое: группы записей и цветовые метки, фильтр по группе.
+- Новое: импорт/экспорт CSV, кнопки «Открыть URL» и «Копировать логин».
+- Новое: горячие клавиши копирования логина (Ctrl+Shift+C) и пароля (Ctrl+Shift+P).
+- Скруглённые поля ввода во всех окнах; в диалоге «О программе» указан
+  автор flytimopheev@gmail.com, ссылка на сайт удалена.
+* Fri Sep 11 2026 flytimopheev <flytimopheev@gmail.com> - 1.0.3-2
 - Убраны RUSTFLAGS с -L на системную glibc (именно из-за них бинарник
   требовал GLIBC_2.39 даже при сборке через cargo-zigbuild).
 - cargo-zigbuild теперь обязателен: при его отсутствии сборка падает,
   а не тихо откатывается на системный cargo.
 - Добавлена проверка %check: сборка падает, если бинарник требует
   символы glibc новее 2.17.
-* Fri Sep 11 2026 Taynik Maintainer <maintainer@local> - 1.0.3-1
+* Fri Sep 11 2026 flytimopheev <flytimopheev@gmail.com> - 1.0.3-1
 - Исправлена сборка с cargo-zigbuild (раньше она незаметно откатывалась
   на системный cargo, и требование GLIBC_2.39 оставалось).
 - Из исходников убраны упоминания прежнего имени проекта.
 
-* Fri Sep 11 2026 Taynik Maintainer <maintainer@local> - 1.0.2-1
+* Fri Sep 11 2026 flytimopheev <flytimopheev@gmail.com> - 1.0.2-1
 - RPM-сборка через cargo-zigbuild с целевой glibc 2.17: бинарник работает
   на РЕД ОС 7/8 и новее (раньше требовалась glibc 2.39 из ubuntu-24.04).
 
-* Fri Sep 11 2026 Taynik Maintainer <maintainer@local> - 1.0.1-1
+* Fri Sep 11 2026 flytimopheev <flytimopheev@gmail.com> - 1.0.1-1
 - Сборка RPM напрямую в GitHub Actions (ubuntu-latest, без docker-контейнера).
 - Исправлен MimeType в taynik.desktop (application/x-taynik).
 - Исправлен URL проекта в диалоге «О программе».
 
-* Thu Sep 10 2026 Taynik Maintainer <maintainer@local> - 1.0.0-1
+* Thu Sep 10 2026 flytimopheev <flytimopheev@gmail.com> - 1.0.0-1
 - Tайник: vault, generator, clipboard auto-clear, auto-lock, автоввод, темы.

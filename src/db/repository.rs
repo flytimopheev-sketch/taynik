@@ -106,7 +106,41 @@ impl Database {
             Ok(pt) if verifier_matches(&pt) => {}
             _ => return Err(DbError::WrongPassword),
         }
+        Self::migrate(&conn)?;
         Ok(Self { conn, key, path: path.to_path_buf() })
+    }
+
+    /// Миграция существующей базы до текущей версии схемы.
+    /// v2: группы, цвета, TOTP-секреты, история паролей.
+    fn migrate(conn: &Connection) -> Result<(), DbError> {
+        conn.execute_batch(super::schema::MIGRATE_V2)
+            .map_err(|e| DbError::Corrupted(e.to_string()))?;
+        let cols: Vec<String> = {
+            let mut stmt = conn
+                .prepare("PRAGMA table_info(entries)")
+                .map_err(|e| DbError::Corrupted(e.to_string()))?;
+            let rows = stmt
+                .query_map([], |r| r.get::<_, String>(1))
+                .map_err(|e| DbError::Corrupted(e.to_string()))?;
+            rows.filter_map(|r| r.ok()).collect()
+        };
+        for (name, ddl) in [
+            ("entry_group", "ALTER TABLE entries ADD COLUMN entry_group BLOB"),
+            ("color", "ALTER TABLE entries ADD COLUMN color BLOB"),
+            ("totp", "ALTER TABLE entries ADD COLUMN totp BLOB"),
+        ] {
+            if !cols.iter().any(|c| c == name) {
+                conn.execute(ddl, [])
+                    .map_err(|e| DbError::Corrupted(e.to_string()))?;
+            }
+        }
+        conn.execute(
+            "INSERT INTO meta (key, value) VALUES ('schema_version', ?1)
+             ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            params![SCHEMA_VERSION.to_le_bytes().to_vec()],
+        )
+        .map_err(|e| DbError::Corrupted(e.to_string()))?;
+        Ok(())
     }
 }
 
@@ -184,7 +218,8 @@ impl Database {
         let mut stmt = self
             .conn
             .prepare(
-                "SELECT id, title, username, password, url, notes, tags, favorite, created_at, updated_at
+                "SELECT id, title, username, password, url, notes, tags, favorite,
+                        entry_group, color, totp, created_at, updated_at
                  FROM entries ORDER BY updated_at DESC",
             )
             .map_err(|e| DbError::Corrupted(e.to_string()))?;
@@ -199,15 +234,18 @@ impl Database {
                     row.get::<_, Option<Vec<u8>>>(5)?,
                     row.get::<_, Option<Vec<u8>>>(6)?,
                     row.get::<_, i64>(7)?,
-                    row.get::<_, i64>(8)?,
-                    row.get::<_, i64>(9)?,
+                    row.get::<_, Option<Vec<u8>>>(8)?,
+                    row.get::<_, Option<Vec<u8>>>(9)?,
+                    row.get::<_, Option<Vec<u8>>>(10)?,
+                    row.get::<_, i64>(11)?,
+                    row.get::<_, i64>(12)?,
                 ))
             })
             .map_err(|e| DbError::Corrupted(e.to_string()))?;
 
         let mut out = Vec::new();
         for row in rows {
-            let (id, title, username, password, url, notes, tags, favorite, created_at, updated_at) =
+            let (id, title, username, password, url, notes, tags, favorite, group, color, totp, created_at, updated_at) =
                 row.map_err(|e| DbError::Corrupted(e.to_string()))?;
             let dec = |b: Vec<u8>| -> String { self.dec_opt(Some(b)).unwrap_or_default() };
             let tags: Vec<String> = tags
@@ -223,6 +261,9 @@ impl Database {
                 notes: notes.and_then(|n| self.dec_opt(Some(n))).unwrap_or_default(),
                 tags,
                 favorite: favorite != 0,
+                group: group.and_then(|g| self.dec_opt(Some(g))).unwrap_or_default(),
+                color: color.and_then(|g| self.dec_opt(Some(g))).unwrap_or_default(),
+                totp_secret: totp.and_then(|g| self.dec_opt(Some(g))).unwrap_or_default(),
                 created_at,
                 updated_at,
             });
@@ -238,11 +279,36 @@ impl Database {
             .unwrap_or(0);
         entry.updated_at = now;
         let tags_json = serde_json::to_string(&entry.tags).unwrap_or_else(|_| "[]".into());
+        let group = self.enc(&entry.group);
+        let color = self.enc(&entry.color);
+        let totp = self.enc(&entry.totp_secret);
         if let Some(id) = entry.id {
+            // История: если пароль меняется, прежний сохраняется в entry_history.
+            let old_blob: Option<Option<Vec<u8>>> = self
+                .conn
+                .query_row(
+                    "SELECT password FROM entries WHERE id=?1",
+                    params![id],
+                    |r| r.get(0),
+                )
+                .optional()
+                .map_err(|e| DbError::Corrupted(e.to_string()))?;
+            if let Some(old_enc) = old_blob {
+                let old = old_enc.and_then(|b| self.dec_opt(Some(b))).unwrap_or_default();
+                if old != entry.password && !old.is_empty() {
+                    self.conn
+                        .execute(
+                            "INSERT INTO entry_history (entry_id, password, changed_at)
+                             VALUES (?1, ?2, ?3)",
+                            params![id, self.enc(&old), now],
+                        )
+                        .map_err(|e| DbError::Corrupted(e.to_string()))?;
+                }
+            }
             self.conn
                 .execute(
                     "UPDATE entries SET title=?1, username=?2, password=?3, url=?4, notes=?5,
-                     tags=?6, favorite=?7, updated_at=?8 WHERE id=?9",
+                     tags=?6, favorite=?7, entry_group=?8, color=?9, totp=?10, updated_at=?11 WHERE id=?12",
                     params![
                         self.enc(&entry.title),
                         self.enc(&entry.username),
@@ -251,6 +317,9 @@ impl Database {
                         self.enc(&entry.notes),
                         self.enc(&tags_json),
                         entry.favorite as i64,
+                        group,
+                        color,
+                        totp,
                         entry.updated_at,
                         id
                     ],
@@ -260,8 +329,8 @@ impl Database {
             entry.created_at = now;
             self.conn
                 .execute(
-                    "INSERT INTO entries (title, username, password, url, notes, tags, favorite, created_at, updated_at)
-                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+                    "INSERT INTO entries (title, username, password, url, notes, tags, favorite, entry_group, color, totp, created_at, updated_at)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
                     params![
                         self.enc(&entry.title),
                         self.enc(&entry.username),
@@ -270,6 +339,9 @@ impl Database {
                         self.enc(&entry.notes),
                         self.enc(&tags_json),
                         entry.favorite as i64,
+                        group,
+                        color,
+                        totp,
                         entry.created_at,
                         entry.updated_at
                     ],
@@ -284,6 +356,32 @@ impl Database {
         self.conn
             .execute("DELETE FROM entries WHERE id=?1", params![id])
             .map_err(|e| DbError::Corrupted(e.to_string()))?;
+        self.conn
+            .execute("DELETE FROM entry_history WHERE entry_id=?1", params![id])
+            .map_err(|e| DbError::Corrupted(e.to_string()))?;
         Ok(())
+    }
+
+    /// История паролей записи: (changed_at, пароль), новые сверху.
+    pub fn password_history(&self, entry_id: i64) -> Result<Vec<(i64, String)>, DbError> {
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT changed_at, password FROM entry_history
+                 WHERE entry_id=?1 ORDER BY id DESC",
+            )
+            .map_err(|e| DbError::Corrupted(e.to_string()))?;
+        let rows = stmt
+            .query_map(params![entry_id], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, Vec<u8>>(1)?))
+            })
+            .map_err(|e| DbError::Corrupted(e.to_string()))?;
+        let mut out = Vec::new();
+        for row in rows {
+            let (ts, blob) = row.map_err(|e| DbError::Corrupted(e.to_string()))?;
+            let pass = self.dec_opt(Some(blob)).unwrap_or_default();
+            out.push((ts, pass));
+        }
+        Ok(out)
     }
 }

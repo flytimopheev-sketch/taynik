@@ -17,6 +17,9 @@ pub struct Config {
     pub clipboard_clear_seconds: u64,
     /// Тема оформления (ключ из ui::theme::THEMES).
     pub theme: String,
+    /// Последовательность автоввода: {USERNAME}, {PASSWORD}, {TAB}, {ENTER}
+    /// и произвольный текст.
+    pub autotype_sequence: String,
 }
 
 impl Default for Config {
@@ -27,6 +30,7 @@ impl Default for Config {
             lock_on_minimize: false,
             clipboard_clear_seconds: 45,
             theme: "system".to_string(),
+            autotype_sequence: "{USERNAME}{TAB}{PASSWORD}".to_string(),
         }
     }
 }

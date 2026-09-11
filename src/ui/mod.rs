@@ -4,6 +4,7 @@ pub mod autotype;
 pub mod create_db_dialog;
 pub mod main_window;
 pub mod password_generator;
+pub mod settings_dialog;
 pub mod start_window;
 pub mod theme;
 pub mod unlock_dialog;
