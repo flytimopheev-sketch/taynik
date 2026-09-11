@@ -32,7 +32,14 @@ jobs:
         run: |
           mkdir -p $HOME/rpmbuild/SOURCES
           cp taynik-$VER.tar.gz $HOME/rpmbuild/SOURCES/
-          rpmbuild -bb --nodeps --define _topdir=$HOME/rpmbuild packaging/taynik.spec
+          set -o pipefail
+          rpmbuild -bb --nodeps --define _topdir=$HOME/rpmbuild packaging/taynik.spec 2>&1 | tee rpmbuild.log || {
+            echo "### rpmbuild failed" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            tail -n 120 rpmbuild.log >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            exit 1
+          }
 
       - name: Копирование артефактов
         run: |
