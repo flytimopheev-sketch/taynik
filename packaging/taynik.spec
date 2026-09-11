@@ -30,7 +30,7 @@ Requires:       gtk4 >= 4.10
 ZB=$(command -v cargo-zigbuild || true)
 [ -n "$ZB" ] || ZB="$HOME/.local/bin/cargo-zigbuild"
 if [ -x "$ZB" ]; then
-    RUSTFLAGS="-L /usr/lib/x86_64-linux-gnu" "$ZB" build --release --offline --locked --target x86_64-unknown-linux-gnu.2.17
+    RUSTFLAGS="-L /usr/lib/x86_64-linux-gnu -C link-arg=-Wl,--defsym=fcntl64=fcntl -C link-arg=-Wl,--allow-shlib-undefined" "$ZB" build --release --offline --locked --target x86_64-unknown-linux-gnu.2.17
 else
     echo "cargo-zigbuild не найден — сборка с системной glibc" >&2
     cargo build --release --offline --locked
