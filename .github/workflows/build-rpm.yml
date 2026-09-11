@@ -32,23 +32,7 @@ jobs:
         run: |
           mkdir -p $HOME/rpmbuild/SOURCES
           cp taynik-$VER.tar.gz $HOME/rpmbuild/SOURCES/
-          set -o pipefail
-          rpmbuild -bb --nodeps -D "_topdir $HOME/rpmbuild" packaging/taynik.spec 2>&1 | tee rpmbuild.log || {
-            echo "$VER" > .ver
-            exit 1
-          }
-
-      - name: Диагностика — лог rpmbuild в ветку ci-debug
-        if: failure()
-        run: |
-          git config user.name "ci-bot"
-          git config user.email "ci-bot@users.noreply.github.com"
-          git checkout --orphan ci-debug
-          git reset --hard
-          git rm -rf --cached . -q 2>/dev/null || true
-          git add rpmbuild.log
-          git commit -m "rpmbuild log $VER"
-          git push -f origin ci-debug
+          rpmbuild -bb --nodeps -D "_topdir $HOME/rpmbuild" packaging/taynik.spec
 
       - name: Копирование артефактов
         run: |
