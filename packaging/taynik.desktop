@@ -9,4 +9,4 @@ Terminal=false
 Categories=Utility;Security;
 Keywords=password;пароль;safe;сейф;
 StartupNotify=true
-MimeType=application/x-redpass;
+MimeType=application/x-taynik;

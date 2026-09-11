@@ -222,7 +222,7 @@ impl MainWindow {
                 .program_name("Тайник")
                 .version(env!("CARGO_PKG_VERSION"))
                 .comments("Офлайн-менеджер паролей с автовводом и темами оформления")
-                .website("https://github.com/flytimopheev-sketch/redpass")
+                .website("https://github.com/flytimopheev-sketch/taynik")
                 .copyright("© 2026 Taynik authors")
                 .authors(vec!["Taynik authors".to_string()])
                 .license_type(gtk::License::MitX11)

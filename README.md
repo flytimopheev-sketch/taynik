@@ -54,9 +54,19 @@ cargo build --release
 
 ## Установка (RPM для РЕД ОС 7/8)
 
+Готовый RPM собирается автоматически в GitHub Actions (без docker,
+прямо на ubuntu-раннере) и публикуется в разделе
+[Releases](https://github.com/flytimopheev-sketch/redpass/releases) на тегах `v*`.
+
+```bash
+sudo dnf install ./taynik-1.0.1-1.*.rpm
+```
+
+### Сборка RPM вручную
+
 ```bash
 rpmbuild -bb packaging/taynik.spec
-sudo dnf install ~/rpmbuild/RPMS/x86_64/taynik-1.0.0-1.*.rpm
+sudo dnf install ~/rpmbuild/RPMS/x86_64/taynik-1.0.1-1.*.rpm
 ```
 
 ### Установка на машину без интернета
@@ -71,14 +81,14 @@ sudo dnf install ~/rpmbuild/RPMS/x86_64/taynik-1.0.0-1.*.rpm
 ```bash
 ./packaging/make-source-tarball.sh
 mkdir -p ~/rpmbuild/SOURCES
-cp taynik-1.0.0.tar.gz ~/rpmbuild/SOURCES/
+cp taynik-1.0.1.tar.gz ~/rpmbuild/SOURCES/
 ```
 
 Перенести каталог `rpmbuild` на офлайн-машину, затем:
 
 ```bash
 rpmbuild -bb packaging/taynik.spec
-sudo dnf install ~/rpmbuild/RPMS/x86_64/taynik-1.0.0-1.*.rpm
+sudo dnf install ~/rpmbuild/RPMS/x86_64/taynik-1.0.1-1.*.rpm
 ```
 
 При необходимости обновить вендор: `cargo vendor vendor` (на машине

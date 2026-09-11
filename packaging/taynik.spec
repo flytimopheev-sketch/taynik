@@ -1,5 +1,5 @@
 Name:           taynik
-Version:        1.0.0
+Version:        1.0.1
 Release:        1%{?dist}
 Summary:        Офлайн-менеджер паролей
 License:        MIT
@@ -41,5 +41,10 @@ install -Dm644 packaging/taynik.metainfo.xml %{buildroot}%{_metainfodir}/taynik.
 %{_metainfodir}/taynik.metainfo.xml
 
 %changelog
+* Fri Sep 11 2026 Taynik Maintainer <maintainer@local> - 1.0.1-1
+- Сборка RPM напрямую в GitHub Actions (ubuntu-latest, без docker-контейнера).
+- Исправлен MimeType в taynik.desktop (application/x-taynik).
+- Исправлен URL проекта в диалоге «О программе».
+
 * Thu Sep 10 2026 Taynik Maintainer <maintainer@local> - 1.0.0-1
 - Tайник: vault, generator, clipboard auto-clear, auto-lock, автоввод, темы.

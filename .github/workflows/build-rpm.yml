@@ -11,12 +11,16 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    container:
-      image: fedora:41
     steps:
-      - name: Установка зависимостей
+      - name: Установка зависимостей (без docker, прямо на раннере GitHub)
         run: |
-          dnf -y install rpm-build rust cargo gcc pkgconfig gtk4-devel tar gzip findutils
+          sudo apt-get update
+          sudo apt-get install -y rpm pkg-config libgtk-4-dev
+
+      - name: Версия
+        run: |
+          VER=$(grep -m1 '^version' Cargo.toml | sed 's/version *= *//; s/"//g')
+          echo "VER=$VER" >> $GITHUB_ENV
 
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,14 +30,14 @@ jobs:
 
       - name: Сборка RPM
         run: |
-          mkdir -p "$HOME/rpmbuild/SOURCES"
-          cp taynik-1.0.0.tar.gz "$HOME/rpmbuild/SOURCES/"
-          rpmbuild -bb packaging/taynik.spec
+          mkdir -p $HOME/rpmbuild/SOURCES
+          cp taynik-$VER.tar.gz $HOME/rpmbuild/SOURCES/
+          rpmbuild -bb --define _topdir=$HOME/rpmbuild packaging/taynik.spec
 
       - name: Копирование артефактов
         run: |
           mkdir -p dist
-          find "$HOME/rpmbuild/RPMS" -name '*.rpm' -exec cp {} dist/ \;
+          find $HOME/rpmbuild/RPMS -name '*.rpm' -exec cp {} dist/ \;
           ls -l dist
 
       - name: Upload RPM (артефакт)
