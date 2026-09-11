@@ -8,9 +8,7 @@ use serde_json::json;
 use gtk4::glib;
 
 use super::crypto::{self, ArgonParams, CryptoKey};
-use super::schema::{
-    CREATE_SCHEMA, LEGACY_VERIFIER_PLAINTEXT, SCHEMA_VERSION, VERIFIER_PLAINTEXT,
-};
+use super::schema::{CREATE_SCHEMA, SCHEMA_VERSION, VERIFIER_PLAINTEXT};
 use crate::models::entry::Entry;
 
 #[derive(Debug)]
@@ -114,7 +112,7 @@ impl Database {
 
 /// Verifier корректен, если это текущий или legacy-идентификатор (старые базы).
 fn verifier_matches(pt: &[u8]) -> bool {
-    pt == VERIFIER_PLAINTEXT.as_bytes() || pt == LEGACY_VERIFIER_PLAINTEXT.as_bytes()
+    pt == VERIFIER_PLAINTEXT.as_bytes() || pt == super::schema::legacy_verifier().as_bytes()
 }
 
 impl Database {
