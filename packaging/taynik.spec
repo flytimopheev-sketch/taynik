@@ -36,9 +36,21 @@ if [ ! -x "$ZB" ]; then
     echo "ОШИБКА: cargo-zigbuild не найден — сборка с системной glibc недопустима" >&2
     exit 1
 fi
-# ВАЖНО: не задавать RUSTFLAGS с -L на системную glibc — иначе линковщик
-# возьмёт символы из системной glibc и требование GLIBC_2.39 вернётся.
-RUSTFLAGS="" "$ZB" build --release --offline --locked --target x86_64-unknown-linux-gnu.2.17
+# ВАЖНО: нельзя давать -L на каталог с системной glibc (/usr/lib/x86_64-linux-gnu) —
+# линковщик подхватит системную libc и требование GLIBC_2.39 вернётся. Вместо этого
+# собираем каталог syslibs с симлинками только на GTK-зависимости; libc при этом
+# предоставляется самим zig (совместимая с glibc 2.17).
+LIBDIR=$(pkg-config --variable=libdir gtk4 2>/dev/null)
+if [ -z "$LIBDIR" ] && [ -d /usr/lib/x86_64-linux-gnu ]; then LIBDIR=/usr/lib/x86_64-linux-gnu; fi
+if [ -z "$LIBDIR" ] && [ -d /usr/lib64 ]; then LIBDIR=/usr/lib64; fi
+[ -n "$LIBDIR" ] || { echo "ОШИБКА: не найден каталог системных библиотек GTK" >&2; exit 1; }
+mkdir -p syslibs
+for L in gtk-4 gdk-4 gsk-4 glib-2.0 gobject-2.0 gio-2.0 cairo cairo-gobject \
+         pango-1.0 pangocairo-1.0 harfbuzz gdk_pixbuf-2.0 graphene-1.0 z m; do
+    if [ -e "$LIBDIR/lib$L.so" ]; then ln -sf "$LIBDIR/lib$L.so" "syslibs/lib$L.so"; fi
+done
+RUSTFLAGS="-C link-arg=-L$(pwd)/syslibs -C link-arg=-Wl,--allow-shlib-undefined" \
+    "$ZB" build --release --offline --locked --target x86_64-unknown-linux-gnu.2.17
 
 %check
 # Контроль: бинарник не должен требовать символы glibc новее 2.17.
