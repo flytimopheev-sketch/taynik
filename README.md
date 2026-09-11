@@ -56,7 +56,7 @@ cargo build --release
 
 Готовый RPM собирается автоматически в GitHub Actions (без docker,
 прямо на ubuntu-раннере) и публикуется в разделе
-[Releases](https://github.com/flytimopheev-sketch/redpass/releases) на тегах `v*`.
+[Releases](https://github.com/flytimopheev-sketch/taynik/releases) на тегах `v*`.
 
 ```bash
 sudo dnf install ./taynik-1.0.1-1.*.rpm

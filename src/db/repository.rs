@@ -8,7 +8,9 @@ use serde_json::json;
 use gtk4::glib;
 
 use super::crypto::{self, ArgonParams, CryptoKey};
-use super::schema::{CREATE_SCHEMA, SCHEMA_VERSION, VERIFIER_PLAINTEXT};
+use super::schema::{
+    CREATE_SCHEMA, LEGACY_VERIFIER_PLAINTEXT, SCHEMA_VERSION, VERIFIER_PLAINTEXT,
+};
 use crate::models::entry::Entry;
 
 #[derive(Debug)]
@@ -103,11 +105,16 @@ impl Database {
             .query_row("SELECT value FROM meta WHERE key='verifier'", [], |r| r.get(0))
             .map_err(|e| DbError::Corrupted(e.to_string()))?;
         match crypto::decrypt(&key, &blob) {
-            Ok(pt) if pt == VERIFIER_PLAINTEXT.as_bytes() => {}
+            Ok(pt) if verifier_matches(&pt) => {}
             _ => return Err(DbError::WrongPassword),
         }
         Ok(Self { conn, key, path: path.to_path_buf() })
     }
+}
+
+/// Verifier корректен, если это текущий или legacy-идентификатор (старые базы).
+fn verifier_matches(pt: &[u8]) -> bool {
+    pt == VERIFIER_PLAINTEXT.as_bytes() || pt == LEGACY_VERIFIER_PLAINTEXT.as_bytes()
 }
 
 impl Database {
@@ -120,7 +127,7 @@ impl Database {
             .query_row("SELECT value FROM meta WHERE key='verifier'", [], |r| r.get(0))
             .map_err(|e| DbError::Corrupted(e.to_string()))?;
         match crypto::decrypt(&check, &blob) {
-            Ok(pt) if pt == VERIFIER_PLAINTEXT.as_bytes() => {}
+            Ok(pt) if verifier_matches(&pt) => {}
             _ => return Err(DbError::WrongPassword),
         }
 

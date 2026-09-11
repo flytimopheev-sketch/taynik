@@ -3,7 +3,11 @@
 pub const SCHEMA_VERSION: i64 = 1;
 
 /// Открытый текст, которым проверяется корректность мастер-пароля.
-pub const VERIFIER_PLAINTEXT: &str = "redpass-verifier-v1";
+pub const VERIFIER_PLAINTEXT: &str = "taynik-verifier-v1";
+
+/// Verifier из старых баз (до переименования проекта) — для совместимости
+/// при открытии существующих баз. Новые базы создаются с VERIFIER_PLAINTEXT.
+pub const LEGACY_VERIFIER_PLAINTEXT: &str = "redpass-verifier-v1";
 
 pub const CREATE_SCHEMA: &str = "
 CREATE TABLE IF NOT EXISTS meta (

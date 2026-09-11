@@ -3,7 +3,7 @@ Version:        1.0.1
 Release:        1%{?dist}
 Summary:        Офлайн-менеджер паролей
 License:        MIT
-URL:            https://example.local/taynik
+URL:            https://github.com/flytimopheev-sketch/taynik
 Source0:        %{name}-%{version}.tar.gz
 BuildRequires:  rust
 BuildRequires:  cargo
@@ -11,6 +11,7 @@ BuildRequires:  gcc
 BuildRequires:  pkgconfig
 BuildRequires:  gtk4-devel >= 4.10
 Requires:       gtk4 >= 4.10
+%global _metainfodir %{_datadir}/metainfo
 
 %description
 Тайник — локальный GTK4-менеджер паролей. База хранится
