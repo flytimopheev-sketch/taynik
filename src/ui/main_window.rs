@@ -136,7 +136,7 @@ impl MainWindow {
         // из обработчика сигнала) — откладываем.
         glib::idle_add_local_once(move || {
             parent.destroy()
-        }));
+        });
         m
     }
 
