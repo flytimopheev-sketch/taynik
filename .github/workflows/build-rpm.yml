@@ -33,7 +33,7 @@ jobs:
           mkdir -p $HOME/rpmbuild/SOURCES
           cp taynik-$VER.tar.gz $HOME/rpmbuild/SOURCES/
           set -o pipefail
-          rpmbuild -bb --nodeps --define _topdir=$HOME/rpmbuild packaging/taynik.spec 2>&1 | tee rpmbuild.log || {
+          rpmbuild -bb --nodeps -D "_topdir $HOME/rpmbuild" packaging/taynik.spec 2>&1 | tee rpmbuild.log || {
             echo "$VER" > .ver
             exit 1
           }
