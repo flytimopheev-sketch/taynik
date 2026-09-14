@@ -78,10 +78,17 @@ install -Dm644 packaging/taynik.metainfo.xml %{buildroot}%{_metainfodir}/taynik.
 
 %changelog
 * Mon Sep 14 2026 flytimopheev <flytimopheev@gmail.com> - 1.1.1-1
-- Исправлена сборка RPM: убрана дублирующая закрывающая скобка в
-  src/ui/main_window.rs (строка 1292), из-за которой блок impl MainWindow
-  закрывался преждевременно и компиляция падала с ошибкой
-  "unexpected closing delimiter" на этапе %build.
+- Исправлена сборка RPM: устранены ошибки компиляции в src/ui/main_window.rs,
+  из-за которых %build падал.
+  - убрана дублирующая закрывающая скобка (ранний выход из impl MainWindow,
+    ошибка "unexpected closing delimiter");
+  - DropDown::from_strings получал &Vec<String> вместо &[&str] (списки тегов,
+    групп и цветов теперь собраны как Vec<&str>);
+  - gtk::show_uri возвращает (), а код ожидал Result при открытии URL;
+  - copy_btn в диалоге TOTP приводился к Widget, а не Button из-за типа
+    Dialog::add_button -> Widget;
+  - экспорт CSV: движением Rc<MainWindow> во внутренний move-обработчик внутри
+    Fn-обработчика добавлен промежуточный clone().
 * Fri Sep 11 2026 flytimopheev <flytimopheev@gmail.com> - 1.1.0-1
 - Новое: настраиваемая последовательность автоввода ({USERNAME}{TAB}{PASSWORD}
   и произвольные токены) и диалог настроек.

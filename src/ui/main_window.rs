@@ -77,13 +77,13 @@ impl MainWindow {
             window.set_application(Some(app));
         }
 
-        let color_items: Vec<String> = COLOR_PALETTE
+        let color_items: Vec<&str> = COLOR_PALETTE
             .iter()
-            .map(|(_, name)| name.to_string())
+            .map(|(_, name)| name)
             .collect();
 
-        let tag_items: Vec<String> = vec!["Все теги".to_string()];
-        let group_items: Vec<String> = vec!["Все группы".to_string()];
+        let tag_items: Vec<&str> = vec!["Все теги"];
+        let group_items: Vec<&str> = vec!["Все группы"];
         let m = Rc::new(MainWindow {
             window: window.clone(),
             state: state.clone(),
@@ -928,9 +928,7 @@ impl MainWindow {
         if !url.contains("://") {
             url = format!("https://{url}");
         }
-        if let Err(e) = gtk::show_uri(Some(&self.window), &url, 0) {
-            show_error(&self.window, &format!("Не удалось открыть URL:\n{e}"));
-        }
+        gtk::show_uri(Some(&self.window), &url, 0);
     }
 
     /// Показать текущий TOTP-код с обратным отсчётом и копированием.
@@ -947,7 +945,10 @@ impl MainWindow {
             .default_width(320)
             .build();
         dialog.add_button("Закрыть", gtk::ResponseType::Close);
-        let copy_btn = dialog.add_button("Копировать", gtk::ResponseType::Apply);
+        let copy_btn: gtk::Button = dialog
+            .add_button("Копировать", gtk::ResponseType::Apply)
+            .downcast()
+            .expect("add_button создаёт Button");
 
         let content = dialog.content_area();
         let box_ = gtk::Box::builder()
@@ -1107,16 +1108,17 @@ impl MainWindow {
                 filter.add_pattern("*.csv");
                 chooser.add_filter(&filter);
                 chooser.set_current_name("taynik-export.csv");
+                let m2 = m.clone();
                 chooser.connect_response(move |c, resp| {
                     if resp == gtk::ResponseType::Accept {
                         if let Some(path) = c.file().and_then(|f| f.path()) {
-                            let entries = match m.state.db.borrow().as_ref() {
+                            let entries = match m2.state.db.borrow().as_ref() {
                                 Some(db) => db.list_entries().unwrap_or_default(),
                                 None => Vec::new(),
                             };
                             match io::export_csv(&path, &entries) {
-                                Ok(n) => m.toast_toast(&format!("Экспортировано записей: {n}")),
-                                Err(e) => show_error(&m.window, &format!("Ошибка экспорта:\n{e}")),
+                                Ok(n) => m2.toast_toast(&format!("Экспортировано записей: {n}")),
+                                Err(e) => show_error(&m2.window, &format!("Ошибка экспорта:\n{e}")),
                             }
                         }
                     }
