@@ -134,8 +134,11 @@ impl MainWindow {
         // Нельзя уничтожать родителя синхронно: мы, скорее всего, находимся
         // внутри его обработчика сигнала (кнопка «Создать базу» вызывается
         // из обработчика сигнала) — откладываем.
-        glib::idle_add_local_once(move || {
-            parent.destroy()
+        glib::idle_add_local_once({
+            let parent = parent.clone();
+            move || {
+                parent.destroy()
+            }
         });
         m
     }
