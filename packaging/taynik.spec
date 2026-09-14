@@ -1,6 +1,6 @@
 Name:           taynik
-Version:        1.1.0
-Release:        2%{?dist}
+Version:        1.1.1
+Release:        1%{?dist}
 Summary:        Офлайн-менеджер паролей
 License:        MIT
 Source0:        %{name}-%{version}.tar.gz
@@ -77,6 +77,11 @@ install -Dm644 packaging/taynik.metainfo.xml %{buildroot}%{_metainfodir}/taynik.
 %{_metainfodir}/taynik.metainfo.xml
 
 %changelog
+* Mon Sep 14 2026 flytimopheev <flytimopheev@gmail.com> - 1.1.1-1
+- Исправлена сборка RPM: убрана дублирующая закрывающая скобка в
+  src/ui/main_window.rs (строка 1292), из-за которой блок impl MainWindow
+  закрывался преждевременно и компиляция падала с ошибкой
+  "unexpected closing delimiter" на этапе %build.
 * Fri Sep 11 2026 flytimopheev <flytimopheev@gmail.com> - 1.1.0-1
 - Новое: настраиваемая последовательность автоввода ({USERNAME}{TAB}{PASSWORD}
   и произвольные токены) и диалог настроек.
