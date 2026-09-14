@@ -1289,7 +1289,7 @@ impl MainWindow {
         });
         dialog.show();
     }
-}
+
     fn update_strength(self: &Rc<Self>) {
         let pass = self.password_e.text().to_string();
         if pass.is_empty() {
