@@ -79,7 +79,7 @@ impl MainWindow {
 
         let color_items: Vec<&str> = COLOR_PALETTE
             .iter()
-            .map(|(_, name)| name)
+            .map(|(_, name)| *name)
             .collect();
 
         let tag_items: Vec<&str> = vec!["Все теги"];
