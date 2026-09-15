@@ -1,5 +1,5 @@
 Name:           taynik
-Version:        1.1.1
+Version:        1.1.2
 Release:        1%{?dist}
 Summary:        Офлайн-менеджер паролей
 License:        MIT
@@ -11,6 +11,10 @@ BuildRequires:  binutils
 BuildRequires:  pkgconfig
 BuildRequires:  gtk4-devel >= 4.10
 Requires:       gtk4 >= 4.10
+Requires:       xdotool
+# wtype — вендор менеджеров паролей Wayland; в ряде репозиториев отсутствует,
+# поэтому связь мягкая (не ломает установку, но dnf ставит по умолчанию).
+Recommends:     wtype
 %global _metainfodir %{_datadir}/metainfo
 
 %description
@@ -77,6 +81,18 @@ install -Dm644 packaging/taynik.metainfo.xml %{buildroot}%{_metainfodir}/taynik.
 %{_metainfodir}/taynik.metainfo.xml
 
 %changelog
+* Mon Sep 14 2026 flytimopheev <flytimopheev@gmail.com> - 1.1.2-1
+- Автоввод: предпусковая диагностика — если вспомогательная утилита
+  xdotool (X11) / wtype (Wayland) отсутствует, теперь показывается понятное
+  сообщение об ошибке вместо молчаливого бездействия.
+- Автоввод: определение окружения по XDG_SESSION_TYPE (выбор xdotool/wtype)
+  вместо проверки по DISPLAY/WAYLAND_DISPLAY, которая ошибочно выбирала
+  xdotool в XWayland-сессиях Wayland.
+- RPM: добавлена зависимость xdotool и мягкая (Recommends) wtype, чтобы
+  автоввод работал «из коробки».
+- Блокировка: при авто/ручной блокировке очищается список записей, чтобы
+  после нажатия «Отмена» в диалоге мастер-пароля окно не выглядело
+  отключенным с прежними записями.
 * Mon Sep 14 2026 flytimopheev <flytimopheev@gmail.com> - 1.1.1-1
 - Исправлена сборка RPM: устранены ошибки компиляции в src/ui/main_window.rs,
   из-за которых %build падал.

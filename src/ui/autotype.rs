@@ -12,7 +12,51 @@ use gtk4 as gtk;
 use gtk4::glib;
 use gtk4::prelude::*;
 
+use super::show_error;
+
 const COUNTDOWN_SECS: u32 = 5;
+
+/// Каким способом выполняем синтетический ввод.
+#[derive(Clone, Copy)]
+enum Backend {
+    /// X11 — через xdotool.
+    X11,
+    /// Wayland — через wtype.
+    Wayland,
+}
+
+/// Определить окружение. Приоритет — переменная XDG_SESSION_TYPE: она не даёт
+/// спутать XWayland-сессию с чистой X11 (раньше проверяли только DISPLAY,
+/// из-за чего в режиме XWayland выбирался xdotool и синтез клавиш тихо не
+/// работал под Wayland).
+fn detect_backend() -> Backend {
+    if let Ok(s) = std::env::var("XDG_SESSION_TYPE") {
+        if s.to_lowercase().contains("wayland") {
+            return Backend::Wayland;
+        }
+    }
+    let has_wayland = std::env::var("WAYLAND_DISPLAY")
+        .map(|v| !v.is_empty())
+        .unwrap_or(false);
+    let has_x = std::env::var("DISPLAY")
+        .map(|v| !v.is_empty())
+        .unwrap_or(false);
+    if has_wayland && !has_x {
+        Backend::Wayland
+    } else {
+        Backend::X11
+    }
+}
+
+/// Проверить, установлена ли вспомогательная утилита (xdotool/wtype).
+/// `status()` возвращает Ok, если процесс удалось запустить; итоговый код
+/// выхода не важен.
+fn command_available(tool: &str) -> bool {
+    std::process::Command::new(tool)
+        .arg("--version")
+        .status()
+        .is_ok()
+}
 
 /// Один шаг последовательности автоввода.
 #[derive(Clone)]
@@ -88,10 +132,30 @@ fn parse_sequence(seq: &str, username: &str, password: &str) -> Vec<Step> {
 }
 /// Показать окно обратного отсчёта, дать пользователю время переключиться
 /// в целевое окно, затем выполнить последовательность автоввода.
-pub fn run(username: &str, password: &str, sequence: &str) {
+pub fn run(parent: &impl IsA<gtk::Window>, username: &str, password: &str, sequence: &str) {
     if username.is_empty() && password.is_empty() {
         return;
     }
+
+    // Предпусковая диагностика: без xdotool (X11) / wtype (Wayland) автоввод
+    // физически не сработает. Сообщаем пользователю, а не молчим.
+    let backend = detect_backend();
+    let tool = match backend {
+        Backend::X11 => "xdotool",
+        Backend::Wayland => "wtype",
+    };
+    if !command_available(tool) {
+        show_error(
+            parent,
+            &format!(
+                "Автоввод не работает: утилита `{tool}` не найдена в системе.\n\n\
+                 На X11 нужен `xdotool`, на Wayland — `wtype`.\n\
+                 Установите её или воспользуйтесь копированием пароля."
+            ),
+        );
+        return;
+    }
+
     // Клонируем в owned, т.к. используется внутри замыкания таймера.
     let username = username.to_string();
     let password = password.to_string();
@@ -117,7 +181,7 @@ pub fn run(username: &str, password: &str, sequence: &str) {
         let r = remaining.get();
         if r == 0 {
             win.destroy();
-            type_sequence(&parse_sequence(&sequence, &username, &password));
+            type_sequence(&parse_sequence(&sequence, &username, &password), backend);
             return glib::ControlFlow::Break;
         }
         remaining.set(r - 1);
@@ -131,26 +195,19 @@ pub fn run(username: &str, password: &str, sequence: &str) {
 /// Выполнить последовательность в активном окне.
 /// X11 — xdotool, Wayland — wtype. Выполняется в отдельном потоке,
 /// чтобы не блокировать главный цикл GTK.
-fn type_sequence(steps: &[Step]) {
-    let wayland_only = std::env::var("WAYLAND_DISPLAY")
-        .map(|v| !v.is_empty())
-        .unwrap_or(false)
-        && std::env::var("DISPLAY")
-            .map(|v| v.is_empty())
-            .unwrap_or(true);
+fn type_sequence(steps: &[Step], backend: Backend) {
     let steps: Vec<Step> = steps.to_vec();
     std::thread::spawn(move || {
         for step in steps {
             match step {
                 Step::Text(text) => {
-                    let _ = if wayland_only {
-                        Command::new("wtype")
+                    let _ = match backend {
+                        Backend::Wayland => Command::new("wtype")
                             .arg("-d")
                             .arg("60")
                             .arg(&text)
-                            .status()
-                    } else {
-                        Command::new("xdotool")
+                            .status(),
+                        Backend::X11 => Command::new("xdotool")
                             .args([
                                 "type",
                                 "--clearmodifiers",
@@ -159,16 +216,15 @@ fn type_sequence(steps: &[Step]) {
                                 "--",
                                 &text,
                             ])
-                            .status()
+                            .status(),
                     };
                 }
                 Step::Key(key) => {
-                    let _ = if wayland_only {
-                        Command::new("wtype").arg("-k").arg(key).status()
-                    } else {
-                        Command::new("xdotool")
+                    let _ = match backend {
+                        Backend::Wayland => Command::new("wtype").arg("-k").arg(key).status(),
+                        Backend::X11 => Command::new("xdotool")
                             .args(["key", "--clearmodifiers", key])
-                            .status()
+                            .status(),
                     };
                 }
                 Step::Delay(ms) => {

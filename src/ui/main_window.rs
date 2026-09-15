@@ -882,7 +882,7 @@ impl MainWindow {
         let sequence = self.state.config.borrow().autotype_sequence.clone();
         // Автоввод считается активностью: не даём сработать автоблокировке.
         self.last_activity.set(glib::monotonic_time());
-        super::autotype::run(&username, &password, &sequence);
+        super::autotype::run(&self.window, &username, &password, &sequence);
     }
 
     fn copy_password(self: &Rc<Self>) {
@@ -1217,7 +1217,11 @@ impl MainWindow {
         self.locked.set(true);
         let path = self.state.db.borrow().as_ref().map(|db| db.path.clone());
         *self.state.db.borrow_mut() = None;
-        self.clear_details();
+        // Перестраиваем UI с закрытой базой: refresh() сбросит и список записей,
+        // и детали, чтобы после «Отмена» в диалоге пароля окно не выглядело
+        // открытым с прежними записями (и расшифрованные записи не оставались
+        // в памяти видимыми).
+        self.refresh();
         if let Some(path) = path {
             let win = self.window.clone();
             let state = self.state.clone();
