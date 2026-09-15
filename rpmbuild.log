@@ -1,0 +1,267 @@
+Executing(%prep): /bin/sh -e /var/tmp/rpm-tmp.pPqLiC
++ umask 022
++ cd /home/runner/rpmbuild/BUILD
++ cd /home/runner/rpmbuild/BUILD
++ rm -rf taynik-1.1.2
++ /usr/lib/rpm/rpmuncompress -x /home/runner/rpmbuild/SOURCES/taynik-1.1.2.tar.gz
++ STATUS=0
++ [ 0 -ne 0 ]
++ cd taynik-1.1.2
++ /bin/chmod -Rf a+rX,u+w,g-w,o-w .
++ RPM_EC=0
++ jobs -p
++ exit 0
+Executing(%build): /bin/sh -e /var/tmp/rpm-tmp.NwTKwq
++ umask 022
++ cd /home/runner/rpmbuild/BUILD
++ cd taynik-1.1.2
++ command -v cargo-zigbuild
++ ZB=/home/runner/.local/bin/cargo-zigbuild
++ [ -n /home/runner/.local/bin/cargo-zigbuild ]
++ [ ! -x /home/runner/.local/bin/cargo-zigbuild ]
++ pkg-config --variable=libdir gtk4
++ LIBDIR=/usr/lib/x86_64-linux-gnu
++ [ -z /usr/lib/x86_64-linux-gnu ]
++ [ -z /usr/lib/x86_64-linux-gnu ]
++ [ -n /usr/lib/x86_64-linux-gnu ]
++ mkdir -p syslibs
++ [ -e /usr/lib/x86_64-linux-gnu/libgtk-4.so ]
++ ln -sf /usr/lib/x86_64-linux-gnu/libgtk-4.so syslibs/libgtk-4.so
++ [ -e /usr/lib/x86_64-linux-gnu/libgdk-4.so ]
++ [ -e /usr/lib/x86_64-linux-gnu/libgsk-4.so ]
++ [ -e /usr/lib/x86_64-linux-gnu/libglib-2.0.so ]
++ ln -sf /usr/lib/x86_64-linux-gnu/libglib-2.0.so syslibs/libglib-2.0.so
++ [ -e /usr/lib/x86_64-linux-gnu/libgobject-2.0.so ]
++ ln -sf /usr/lib/x86_64-linux-gnu/libgobject-2.0.so syslibs/libgobject-2.0.so
++ [ -e /usr/lib/x86_64-linux-gnu/libgio-2.0.so ]
++ ln -sf /usr/lib/x86_64-linux-gnu/libgio-2.0.so syslibs/libgio-2.0.so
++ [ -e /usr/lib/x86_64-linux-gnu/libcairo.so ]
++ ln -sf /usr/lib/x86_64-linux-gnu/libcairo.so syslibs/libcairo.so
++ [ -e /usr/lib/x86_64-linux-gnu/libcairo-gobject.so ]
++ ln -sf /usr/lib/x86_64-linux-gnu/libcairo-gobject.so syslibs/libcairo-gobject.so
++ [ -e /usr/lib/x86_64-linux-gnu/libpango-1.0.so ]
++ ln -sf /usr/lib/x86_64-linux-gnu/libpango-1.0.so syslibs/libpango-1.0.so
++ [ -e /usr/lib/x86_64-linux-gnu/libpangocairo-1.0.so ]
++ ln -sf /usr/lib/x86_64-linux-gnu/libpangocairo-1.0.so syslibs/libpangocairo-1.0.so
++ [ -e /usr/lib/x86_64-linux-gnu/libharfbuzz.so ]
++ ln -sf /usr/lib/x86_64-linux-gnu/libharfbuzz.so syslibs/libharfbuzz.so
++ [ -e /usr/lib/x86_64-linux-gnu/libgdk_pixbuf-2.0.so ]
++ ln -sf /usr/lib/x86_64-linux-gnu/libgdk_pixbuf-2.0.so syslibs/libgdk_pixbuf-2.0.so
++ [ -e /usr/lib/x86_64-linux-gnu/libgraphene-1.0.so ]
++ ln -sf /usr/lib/x86_64-linux-gnu/libgraphene-1.0.so syslibs/libgraphene-1.0.so
++ [ -e /usr/lib/x86_64-linux-gnu/libvulkan.so ]
++ ln -sf /usr/lib/x86_64-linux-gnu/libvulkan.so syslibs/libvulkan.so
++ [ -e /usr/lib/x86_64-linux-gnu/libz.so ]
++ ln -sf /usr/lib/x86_64-linux-gnu/libz.so syslibs/libz.so
++ [ -e /usr/lib/x86_64-linux-gnu/libm.so ]
++ ln -sf /usr/lib/x86_64-linux-gnu/libm.so syslibs/libm.so
++ /home/runner/.local/bin/cargo-zigbuild build --release --offline --locked --target x86_64-unknown-linux-gnu.2.17
+   Compiling winnow v1.0.4
+   Compiling toml_datetime v1.1.1+spec-1.1.0
+   Compiling pkg-config v0.3.34
+   Compiling target-lexicon v0.13.5
+   Compiling serde_spanned v1.1.1
+   Compiling heck v0.5.0
+   Compiling smallvec v1.16.0
+   Compiling version-compare v0.2.1
+   Compiling libc v0.2.189
+   Compiling proc-macro2 v1.0.107
+   Compiling cfg-expr v0.20.9
+   Compiling toml_parser v1.1.3+spec-1.1.0
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.24
+   Compiling toml v1.1.5+spec-1.1.0
+   Compiling version_check v0.9.5
+   Compiling system-deps v7.0.8
+   Compiling cfg-if v1.0.4
+   Compiling generic-array v0.14.7
+   Compiling syn v3.0.4
+   Compiling typenum v1.20.1
+   Compiling getrandom v0.2.17
+   Compiling rand_core v0.6.4
+   Compiling equivalent v1.0.2
+   Compiling hashbrown v0.17.1
+   Compiling glib-sys v0.20.10
+   Compiling gobject-sys v0.20.10
+   Compiling gio-sys v0.20.10
+   Compiling indexmap v2.14.1
+   Compiling futures-core v0.3.34
+   Compiling crypto-common v0.1.7
+   Compiling syn v2.0.119
+   Compiling toml_edit v0.25.13+spec-1.1.0
+   Compiling proc-macro-crate v3.5.0
+   Compiling futures-task v0.3.34
+   Compiling slab v0.4.12
+   Compiling pin-project-lite v0.2.17
+   Compiling bitflags v2.13.1
+   Compiling memchr v2.8.3
+   Compiling futures-channel v0.3.34
+   Compiling gdk-pixbuf-sys v0.20.10
+   Compiling futures-macro v0.3.34
+   Compiling pango-sys v0.20.10
+   Compiling cairo-sys-rs v0.20.10
+   Compiling zerocopy v0.8.56
+   Compiling serde_core v1.0.229
+   Compiling subtle v2.6.1
+   Compiling futures-util v0.3.34
+   Compiling graphene-sys v0.20.10
+   Compiling gdk4-sys v0.9.6
+   Compiling gio v0.20.12
+   Compiling glib-macros v0.20.12
+   Compiling futures-executor v0.3.34
+   Compiling serde v1.0.229
+   Compiling futures-io v0.3.34
+   Compiling serde_derive v1.0.229
+   Compiling gsk4-sys v0.9.6
+   Compiling ahash v0.8.12
+   Compiling semver v1.0.28
+   Compiling find-msvc-tools v0.1.11
+   Compiling shlex v2.0.1
+   Compiling cpufeatures v0.2.17
+   Compiling autocfg v1.5.1
+   Compiling memoffset v0.9.1
+   Compiling cc v1.4.4
+   Compiling rustc_version v0.4.1
+   Compiling glib v0.20.12
+   Compiling inout v0.1.4
+   Compiling vcpkg v0.2.15
+   Compiling once_cell v1.21.4
+   Compiling cipher v0.4.4
+   Compiling libsqlite3-sys v0.30.1
+   Compiling field-offset v0.3.6
+   Compiling universal-hash v0.5.1
+   Compiling block-buffer v0.10.4
+   Compiling gtk4-sys v0.9.6
+   Compiling zmij v1.0.23
+   Compiling opaque-debug v0.3.1
+   Compiling polyval v0.6.2
+   Compiling digest v0.10.7
+   Compiling serde_spanned v0.6.9
+   Compiling toml_datetime v0.6.11
+   Compiling hashbrown v0.14.5
+   Compiling ppv-lite86 v0.2.21
+   Compiling base64ct v1.8.3
+   Compiling toml_write v0.1.2
+   Compiling serde_json v1.0.151
+   Compiling winnow v0.7.15
+   Compiling password-hash v0.5.0
+   Compiling rand_chacha v0.3.1
+   Compiling hashlink v0.9.1
+   Compiling blake2 v0.10.6
+   Compiling toml_edit v0.22.27
+   Compiling ghash v0.5.1
+   Compiling aes v0.8.4
+   Compiling cairo-rs v0.20.12
+   Compiling graphene-rs v0.20.10
+   Compiling ctr v0.9.2
+   Compiling gtk4-macros v0.9.5
+   Compiling aead v0.5.2
+   Compiling fallible-streaming-iterator v0.1.9
+   Compiling itoa v1.0.18
+   Compiling fallible-iterator v0.3.0
+   Compiling taynik v1.1.2 (/home/runner/rpmbuild/BUILD/taynik-1.1.2)
+   Compiling aes-gcm v0.10.3
+   Compiling toml v0.8.23
+   Compiling argon2 v0.5.3
+   Compiling rand v0.8.8
+   Compiling zeroize v1.9.0
+   Compiling pango v0.20.12
+   Compiling gdk-pixbuf v0.20.10
+   Compiling gdk4 v0.9.6
+   Compiling gsk4 v0.9.6
+   Compiling gtk4 v0.9.7
+   Compiling rusqlite v0.32.1
+warning: linker stderr: ignoring deprecated linker optimization setting '1'
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `taynik` (bin "taynik") generated 1 warning
+    Finished `release` profile [optimized] target(s) in 1m 21s
++ RPM_EC=0
++ jobs -p
++ exit 0
+Executing(%install): /bin/sh -e /var/tmp/rpm-tmp.aHNDVz
++ umask 022
++ cd /home/runner/rpmbuild/BUILD
++ /bin/rm -rf /home/runner/rpmbuild/BUILDROOT/taynik-1.1.2-1.x86_64
++ /bin/mkdir -p /home/runner/rpmbuild/BUILDROOT
++ /bin/mkdir /home/runner/rpmbuild/BUILDROOT/taynik-1.1.2-1.x86_64
++ cd taynik-1.1.2
++ BIN=target/release/taynik
++ [ -x target/release/taynik ]
++ BIN=target/x86_64-unknown-linux-gnu/release/taynik
++ install -Dm755 target/x86_64-unknown-linux-gnu/release/taynik /home/runner/rpmbuild/BUILDROOT/taynik-1.1.2-1.x86_64/usr/bin/taynik
++ install -Dm644 packaging/taynik.desktop /home/runner/rpmbuild/BUILDROOT/taynik-1.1.2-1.x86_64/usr/share/applications/taynik.desktop
++ install -Dm644 resources/icons/taynik.svg /home/runner/rpmbuild/BUILDROOT/taynik-1.1.2-1.x86_64/usr/share/icons/hicolor/scalable/apps/taynik.svg
++ install -Dm644 packaging/taynik.metainfo.xml /home/runner/rpmbuild/BUILDROOT/taynik-1.1.2-1.x86_64/usr/share/metainfo/taynik.metainfo.xml
++ /usr/lib/rpm/brp-compress /usr
++ /usr/lib/rpm/brp-elfperms
++ /usr/lib/rpm/brp-strip /usr/bin/strip
++ /usr/lib/rpm/brp-strip-static-archive /usr/bin/strip
++ /usr/lib/rpm/brp-strip-comment-note /usr/bin/strip /usr/bin/objdump
++ /usr/lib/rpm/brp-remove-la-files
+Executing(%check): /bin/sh -e /var/tmp/rpm-tmp.2oK3RA
++ umask 022
++ cd /home/runner/rpmbuild/BUILD
++ cd taynik-1.1.2
++ BIN=target/x86_64-unknown-linux-gnu/release/taynik
++ objdump -T target/x86_64-unknown-linux-gnu/release/taynik
++ sort -uV
++ grep -o GLIBC_2\.[0-9]*
++ tail -n1
++ MAXSYM=GLIBC_2.17
++ echo Максимальная версия GLIBC-символов: GLIBC_2.17
+Максимальная версия GLIBC-символов: GLIBC_2.17
++ RPM_EC=0
++ jobs -p
++ exit 0
+Processing files: taynik-1.1.2-1.x86_64
+Executing(%doc): /bin/sh -e /var/tmp/rpm-tmp.CbM8kL
++ umask 022
++ cd /home/runner/rpmbuild/BUILD
++ cd taynik-1.1.2
++ DOCDIR=/home/runner/rpmbuild/BUILDROOT/taynik-1.1.2-1.x86_64/usr/share/doc/taynik-1.1.2
++ export LC_ALL=C
++ export DOCDIR
++ /bin/mkdir -p /home/runner/rpmbuild/BUILDROOT/taynik-1.1.2-1.x86_64/usr/share/doc/taynik-1.1.2
++ cp -pr README.md /home/runner/rpmbuild/BUILDROOT/taynik-1.1.2-1.x86_64/usr/share/doc/taynik-1.1.2
++ RPM_EC=0
++ jobs -p
++ exit 0
+Executing(%license): /bin/sh -e /var/tmp/rpm-tmp.ktEOWe
++ umask 022
++ cd /home/runner/rpmbuild/BUILD
++ cd taynik-1.1.2
++ LICENSEDIR=/home/runner/rpmbuild/BUILDROOT/taynik-1.1.2-1.x86_64/usr/share/licenses/taynik-1.1.2
++ export LC_ALL=C
++ export LICENSEDIR
++ /bin/mkdir -p /home/runner/rpmbuild/BUILDROOT/taynik-1.1.2-1.x86_64/usr/share/licenses/taynik-1.1.2
++ cp -pr LICENSE /home/runner/rpmbuild/BUILDROOT/taynik-1.1.2-1.x86_64/usr/share/licenses/taynik-1.1.2
++ RPM_EC=0
++ jobs -p
++ exit 0
+warning: Missing build-id in /home/runner/rpmbuild/BUILDROOT/taynik-1.1.2-1.x86_64/usr/bin/taynik
+Provides: application() application(taynik.desktop) metainfo() metainfo(taynik.metainfo.xml) mimehandler(application/x-taynik) taynik = 1.1.2-1 taynik(x86-64) = 1.1.2-1
+Requires(rpmlib): rpmlib(CompressedFileNames) <= 3.0.4-1 rpmlib(FileDigests) <= 4.6.0-1 rpmlib(PayloadFilesHavePrefix) <= 4.0-1
+Requires: libc.so.6()(64bit) libc.so.6(GLIBC_2.14)(64bit) libc.so.6(GLIBC_2.15)(64bit) libc.so.6(GLIBC_2.16)(64bit) libc.so.6(GLIBC_2.17)(64bit) libc.so.6(GLIBC_2.2.5)(64bit) libc.so.6(GLIBC_2.3)(64bit) libc.so.6(GLIBC_2.3.4)(64bit) libc.so.6(GLIBC_2.9)(64bit) libdl.so.2()(64bit) libdl.so.2(GLIBC_2.2.5)(64bit) libgio-2.0.so.0()(64bit) libglib-2.0.so.0()(64bit) libgobject-2.0.so.0()(64bit) libgtk-4.so.1()(64bit) libm.so.6()(64bit) libm.so.6(GLIBC_2.2.5)(64bit) libpango-1.0.so.0()(64bit) libpthread.so.0()(64bit) libpthread.so.0(GLIBC_2.12)(64bit) libpthread.so.0(GLIBC_2.2.5)(64bit)
+Recommends: wtype
+Checking for unpackaged file(s): /usr/lib/rpm/check-files /home/runner/rpmbuild/BUILDROOT/taynik-1.1.2-1.x86_64
+Wrote: /home/runner/rpmbuild/RPMS/x86_64/taynik-1.1.2-1.x86_64.rpm
+Executing(%clean): /bin/sh -e /var/tmp/rpm-tmp.T1hlYU
++ umask 022
++ cd /home/runner/rpmbuild/BUILD
++ cd taynik-1.1.2
++ /bin/rm -rf /home/runner/rpmbuild/BUILDROOT/taynik-1.1.2-1.x86_64
++ RPM_EC=0
++ jobs -p
++ exit 0
+Executing(rmbuild): /bin/sh -e /var/tmp/rpm-tmp.TJJPTd
++ umask 022
++ cd /home/runner/rpmbuild/BUILD
++ rm -rf taynik-1.1.2 taynik-1.1.2.gemspec
++ RPM_EC=0
++ jobs -p
++ exit 0
+
+RPM build warnings:
+    Missing build-id in /home/runner/rpmbuild/BUILDROOT/taynik-1.1.2-1.x86_64/usr/bin/taynik
