@@ -116,7 +116,9 @@ pub fn generate(opts: &PassphraseOptions) -> Result<String, String> {
         .join(&opts.separator);
 
     if opts.append_number {
-        phrase.push_str(&rng.gen_range(0..10_000).to_string());
+        // Фиксированная ширина в четыре цифры: число всегда добавляет
+        // ровно 10 бит энтропии (0..9999) и не меняет длину фразы.
+        phrase.push_str(&format!("{:04}", rng.gen_range(0..10_000)));
     }
     phrase.push_str(&opts.suffix);
     Ok(phrase)
@@ -176,15 +178,18 @@ mod tests {
             suffix: "!".into(),
             ..Default::default()
         };
-        let phrase = generate(&opts).unwrap();
-        assert!(phrase.ends_with('!'));
-        let digits: String = phrase
-            .chars()
-            .rev()
-            .skip(1)
-            .take_while(|c| c.is_ascii_digit())
-            .collect();
-        assert_eq!(digits.len(), 4);
+        for _ in 0..20 {
+            let phrase = generate(&opts).unwrap();
+            assert!(phrase.ends_with('!'));
+            // Число добавляется ровно четырьмя цифрами.
+            let digits: String = phrase
+                .chars()
+                .rev()
+                .skip(1)
+                .take_while(|c| c.is_ascii_digit())
+                .collect();
+            assert_eq!(digits.len(), 4, "фраза: {phrase}");
+        }
     }
 
     #[test]
