@@ -101,13 +101,8 @@ fn parse_sequence(seq: &str, username: &str, password: &str) -> Vec<Step> {
                 }
                 "TAB" => steps.push(Step::Key("Tab")),
                 "ENTER" | "RETURN" => steps.push(Step::Key("Return")),
-                _ if token
-                    .trim()
-                    .to_uppercase()
-                    .starts_with("DELAY") =>
-                {
+                _ if token.trim().to_uppercase().starts_with("DELAY") => {
                     let ms = token
-                        .trim()
                         .split_whitespace()
                         .nth(1)
                         .and_then(|n| n.parse::<u64>().ok())
@@ -208,14 +203,7 @@ fn type_sequence(steps: &[Step], backend: Backend) {
                             .arg(&text)
                             .status(),
                         Backend::X11 => Command::new("xdotool")
-                            .args([
-                                "type",
-                                "--clearmodifiers",
-                                "--delay",
-                                "60",
-                                "--",
-                                &text,
-                            ])
+                            .args(["type", "--clearmodifiers", "--delay", "60", "--", &text])
                             .status(),
                     };
                 }
@@ -259,11 +247,7 @@ mod tests {
 
     #[test]
     fn parse_custom() {
-        let steps = parse_sequence(
-            "{DELAY 200}{USERNAME}{TAB}{PASSWORD}{ENTER}",
-            "u",
-            "p",
-        );
+        let steps = parse_sequence("{DELAY 200}{USERNAME}{TAB}{PASSWORD}{ENTER}", "u", "p");
         assert_eq!(texts(&steps), vec!["u".to_string(), "p".to_string()]);
         assert!(steps.len() >= 5);
     }

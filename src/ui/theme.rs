@@ -13,17 +13,42 @@ pub struct Theme {
 
 /// Доступные темы (ключ сохраняется в config.toml).
 pub const THEMES: &[Theme] = &[
-    Theme { key: "system", title: "Системная" },
-    Theme { key: "light", title: "Светлая" },
-    Theme { key: "dark", title: "Тёмная" },
-    Theme { key: "nord", title: "Nord" },
-    Theme { key: "dracula", title: "Dracula" },
-    Theme { key: "solarized-dark", title: "Solarized Dark" },
-    Theme { key: "solarized-light", title: "Solarized Light" },
+    Theme {
+        key: "system",
+        title: "Системная",
+    },
+    Theme {
+        key: "light",
+        title: "Светлая",
+    },
+    Theme {
+        key: "dark",
+        title: "Тёмная",
+    },
+    Theme {
+        key: "nord",
+        title: "Nord",
+    },
+    Theme {
+        key: "dracula",
+        title: "Dracula",
+    },
+    Theme {
+        key: "solarized-dark",
+        title: "Solarized Dark",
+    },
+    Theme {
+        key: "solarized-light",
+        title: "Solarized Light",
+    },
 ];
 
 thread_local! {
-    static CURRENT: RefCell<Option<gtk::CssProvider>> = const { RefCell::new(None) };
+    /// Провайдеры, установленные для текущего дисплея: базовый CSS и CSS темы.
+    /// Хранятся, чтобы при смене темы старые провайдеры удалялись, а не
+    /// накапливались (иначе GTK держал бы их до конца работы приложения).
+    static PROVIDERS: RefCell<Vec<(gtk::CssProvider, gtk::CssProvider)>> =
+        const { RefCell::new(Vec::new()) };
 }
 
 /// Применить тему по ключу из THEMES.
@@ -35,10 +60,12 @@ pub fn apply(key: &str) {
     if let Some(s) = gtk::Settings::default() {
         s.set_gtk_application_prefer_dark_theme(dark);
     }
-    CURRENT.with(|cell| {
+    PROVIDERS.with(|cell| {
         let mut cur = cell.borrow_mut();
-        if let Some(old) = cur.take() {
-            gtk::style_context_remove_provider_for_display(&display, &old);
+        // Удаляем ранее установленные провайдеры.
+        for (base, themed) in cur.drain(..) {
+            gtk::style_context_remove_provider_for_display(&display, &base);
+            gtk::style_context_remove_provider_for_display(&display, &themed);
         }
         // Базовый CSS применяется всегда (и для системной темы тоже):
         // единые скругления полей ввода и панелей, как у главного окна.
@@ -49,16 +76,17 @@ pub fn apply(key: &str) {
             &base,
             gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
         );
+        // Тема может не иметь собственного CSS (системная, светлая).
+        let themed = gtk::CssProvider::new();
         if let Some(css) = css_for(key) {
-            let provider = gtk::CssProvider::new();
-            provider.load_from_data(css.as_str());
+            themed.load_from_data(css.as_str());
             gtk::style_context_add_provider_for_display(
                 &display,
-                &provider,
+                &themed,
                 gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
             );
-            *cur = Some(provider);
         }
+        *cur = vec![(base, themed)];
     });
 }
 
@@ -96,7 +124,7 @@ fn css_for(key: &str) -> Option<String> {
         _ => return None,
     };
     Some(format!(
-"window, dialog {{ background-color: {bg}; color: {fg}; }}
+        "window, dialog {{ background-color: {bg}; color: {fg}; }}
 headerbar, .titlebar {{ background-color: {header}; color: {fg}; }}
 searchbar {{ background-color: {bg}; }}
 entry, spinbutton, textview, textview > text {{

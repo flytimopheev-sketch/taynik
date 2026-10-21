@@ -1,0 +1,59 @@
+name: Предложение функции
+description: Предложить новую функцию или улучшение
+title: "[Функция]: "
+labels: ["enhancement", "нужна проверка"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо за идею! Опишите, какую задачу вы хотели бы решать
+        и как представляете её решение.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Какую задачу решает
+      description: Опишите проблему или сценарий использования
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Предлагаемое решение
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Рассмотренные альтернативы
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Область
+      options:
+        - Хранение записей
+        - Генерация паролей
+        - Двухфакторная аутентификация (TOTP)
+        - Импорт и экспорт
+        - Автоввод
+        - Интерфейс и темы
+        - Безопасность
+        - Сборка и упаковка
+        - Другое
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: offline
+    attributes:
+      label: Требования
+      options:
+        - label: Функция должна работать полностью офлайн (без сети и телеметрии)
+          required: false
+        - label: Функция не должна снижать стойкость шифрования базы
+          required: false

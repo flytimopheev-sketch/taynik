@@ -102,9 +102,9 @@ pub fn show_create(parent: &impl IsA<gtk::Window>, state: SharedState) {
                 let p = pass.text().to_string();
                 let c = confirm.text().to_string();
                 let match_ok = !p.is_empty() && p == c;
-                dialog
-                    .widget_for_response(gtk::ResponseType::Ok)
-                    .map(|w| w.set_sensitive(path_ok && match_ok));
+                if let Some(w) = dialog.widget_for_response(gtk::ResponseType::Ok) {
+                    w.set_sensitive(path_ok && match_ok);
+                }
                 if !p.is_empty() && !match_ok {
                     warn.set_text("Пароли не совпадают");
                 } else {
@@ -128,8 +128,7 @@ pub fn show_create(parent: &impl IsA<gtk::Window>, state: SharedState) {
                 let password = pass.text().to_string();
                 match Database::create(&path, &password) {
                     Ok(db) => {
-                        state.config.borrow_mut().last_database =
-                            Some(path.display().to_string());
+                        state.config.borrow_mut().last_database = Some(path.display().to_string());
                         state.config.borrow().save();
                         *state.db.borrow_mut() = Some(db);
                         let win = d.clone().upcast::<gtk::Window>();

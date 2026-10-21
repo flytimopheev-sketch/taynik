@@ -6,7 +6,11 @@ use gtk4 as gtk;
 use gtk4::prelude::*;
 
 /// Показать диалог ввода мастер-пароля; `on_ok` вызывается с введённым паролем.
-pub fn show(parent: &impl IsA<gtk::Window>, _path: &Path, on_ok: impl FnOnce(gtk::Window, String) + 'static) {
+pub fn show(
+    parent: &impl IsA<gtk::Window>,
+    _path: &Path,
+    on_ok: impl FnOnce(gtk::Window, String) + 'static,
+) {
     let dialog = gtk::Dialog::builder()
         .title("Введите мастер-пароль")
         .modal(true)

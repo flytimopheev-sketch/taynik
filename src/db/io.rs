@@ -1,10 +1,17 @@
 //! Импорт/экспорт записей в CSV.
 //! ВНИМАНИЕ: CSV хранит пароли в открытом виде — UI обязан предупреждать.
+//! Для безопасного переноса данных используйте зашифрованный формат
+//! `.taynik` (см. `db::transfer`).
 
 use std::io::Read;
 use std::path::Path;
 
 use crate::models::entry::Entry;
+use crate::models::totp::{TotpAlgorithm, TotpParams};
+
+/// Заголовок CSV-файла.
+pub const CSV_HEADER: &str =
+    "title,username,password,url,notes,tags,group,color,totp_secret,totp_algorithm,totp_digits,totp_period,favorite\r\n";
 
 /// Экранировать поле CSV (RFC 4180).
 fn csv_field(s: &str) -> String {
@@ -15,11 +22,17 @@ fn csv_field(s: &str) -> String {
     }
 }
 
+/// Разобрать булево значение из CSV: 1/0, true/false, yes/no, да/нет.
+fn parse_bool(s: &str) -> bool {
+    matches!(
+        s.trim().to_ascii_lowercase().as_str(),
+        "1" | "true" | "yes" | "y" | "да"
+    )
+}
+
 /// Экспортировать записи в CSV-файл. Возвращает число записей.
 pub fn export_csv(path: &Path, entries: &[Entry]) -> Result<usize, String> {
-    let mut out = String::from(
-        "title,username,password,url,notes,tags,group,color,totp_secret,favorite\r\n",
-    );
+    let mut out = String::from(CSV_HEADER);
     for e in entries {
         let tags = e.tags.join(";");
         let fav = if e.favorite { "1" } else { "0" };
@@ -33,6 +46,9 @@ pub fn export_csv(path: &Path, entries: &[Entry]) -> Result<usize, String> {
             e.group.as_str(),
             e.color.as_str(),
             e.totp_secret.as_str(),
+            e.totp_params.algorithm.as_str(),
+            &e.totp_params.digits.to_string(),
+            &e.totp_params.period.to_string(),
             fav,
         ];
         out.push_str(
@@ -97,18 +113,34 @@ pub fn parse_csv(s: &str) -> Result<Vec<Entry>, String> {
     if header.first().map(|h| h.trim().to_lowercase()).as_deref() != Some("title") {
         return Err("неожиданный формат CSV: ожидается заголовок title,username,password,…".into());
     }
-    let idx = |name: &str| {
-        header
-            .iter()
-            .position(|h| h.trim().to_lowercase() == name)
-    };
+    let idx = |name: &str| header.iter().position(|h| h.trim().to_lowercase() == name);
     let mut out = Vec::new();
     for r in iter {
         if r.iter().all(|f| f.trim().is_empty()) {
             continue;
         }
-        let g = |name: &str| idx(name).and_then(|i| r.get(i)).cloned().unwrap_or_default();
+        let g = |name: &str| {
+            idx(name)
+                .and_then(|i| r.get(i))
+                .cloned()
+                .unwrap_or_default()
+        };
         let tags = g("tags");
+        let totp_secret = g("totp_secret");
+        // Параметры TOTP: если секрет не задан — значения по умолчанию.
+        let mut totp_params = TotpParams::default();
+        if !totp_secret.trim().is_empty() {
+            if let Some(algo) = TotpAlgorithm::parse(&g("totp_algorithm")) {
+                totp_params.algorithm = algo;
+            }
+            if let Ok(d) = g("totp_digits").trim().parse::<u8>() {
+                totp_params.digits = d;
+            }
+            if let Ok(p) = g("totp_period").trim().parse::<u32>() {
+                totp_params.period = p;
+            }
+            totp_params = totp_params.normalized();
+        }
         out.push(Entry {
             id: None,
             title: g("title"),
@@ -123,8 +155,9 @@ pub fn parse_csv(s: &str) -> Result<Vec<Entry>, String> {
                 .collect(),
             group: g("group"),
             color: g("color"),
-            totp_secret: g("totp_secret"),
-            favorite: g("favorite").trim() == "1",
+            totp_secret,
+            totp_params,
+            favorite: parse_bool(&g("favorite")),
             created_at: 0,
             updated_at: 0,
         });
@@ -147,6 +180,7 @@ mod tests {
             group: "Личное".into(),
             color: "#e74c3c".into(),
             totp_secret: "GEZDGNBVGY3TQOJQ".into(),
+            totp_params: TotpParams::default(),
             favorite: true,
             created_at: 0,
             updated_at: 0,
@@ -159,7 +193,7 @@ mod tests {
         let _ = std::fs::create_dir_all(&dir);
         let path = dir.join("test.csv");
         let e = sample();
-        export_csv(&path, &[e.clone()]).unwrap();
+        export_csv(&path, std::slice::from_ref(&e)).unwrap();
         let parsed = import_csv(&path).unwrap();
         assert_eq!(parsed.len(), 1);
         let p = &parsed[0];
@@ -171,5 +205,49 @@ mod tests {
         assert_eq!(p.totp_secret, e.totp_secret);
         assert!(p.favorite);
         let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn csv_keeps_totp_parameters() {
+        let dir = std::env::temp_dir().join("taynik_io_test");
+        let _ = std::fs::create_dir_all(&dir);
+        let path = dir.join("totp.csv");
+        let mut e = sample();
+        e.totp_params = TotpParams {
+            algorithm: TotpAlgorithm::Sha256,
+            digits: 8,
+            period: 60,
+        };
+        export_csv(&path, &[e.clone()]).unwrap();
+        let parsed = import_csv(&path).unwrap();
+        assert_eq!(parsed[0].totp_params.algorithm, TotpAlgorithm::Sha256);
+        assert_eq!(parsed[0].totp_params.digits, 8);
+        assert_eq!(parsed[0].totp_params.period, 60);
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn accepts_various_boolean_spellings() {
+        for v in ["1", "true", "TRUE", "yes", "да"] {
+            let csv = format!("title,password,favorite\nX,p,{v}\n");
+            let parsed = parse_csv(&csv).unwrap();
+            assert!(
+                parsed[0].favorite,
+                "значение {v} должно трактоваться как true"
+            );
+        }
+        for v in ["0", "false", "no", "нет", ""] {
+            let csv = format!("title,password,favorite\nX,p,{v}\n");
+            let parsed = parse_csv(&csv).unwrap();
+            assert!(
+                !parsed[0].favorite,
+                "значение {v} должно трактоваться как false"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_unexpected_header() {
+        assert!(parse_csv("a,b,c\n1,2,3\n").is_err());
     }
 }

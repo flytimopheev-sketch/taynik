@@ -1,0 +1,78 @@
+name: Ошибка
+description: Сообщить об ошибке в Тайнике
+title: "[Ошибка]: "
+labels: ["bug", "нужна проверка"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо за отчёт! Пожалуйста, **не публикуйте** в issue пароли,
+        мастер-пароли, содержимое баз и ключи шифрования.
+
+  - type: input
+    id: version
+    attributes:
+      label: Версия приложения
+      description: Помощь → О программе
+      placeholder: "1.2.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Операционная система
+      options:
+        - РЕД ОС 8
+        - РЕД ОС 7
+        - Другая Linux
+        - Windows
+        - macOS
+    validations:
+      required: true
+
+  - type: input
+    id: gtk
+    attributes:
+      label: Версия GTK
+      description: Вывод команды `pkg-config --modversion gtk4`
+      placeholder: "4.10.0"
+    validations:
+      required: false
+
+  - type: textarea
+    id: what
+    attributes:
+      label: Что произошло
+      description: Опишите, что вы ожидали и что получилось на самом деле
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Шаги для воспроизведения
+      placeholder: |
+        1. Открыть базу …
+        2. Нажать …
+        3. Получить …
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Логи или скриншот
+      description: Вывод из терминала, журнал или снимок экрана
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Дополнительно
+      options:
+        - label: Я проверил, что проблема воспроизводится на последней версии
+          required: false
+        - label: Я проверил, что проблема не связана с другой версией приложения
+          required: false

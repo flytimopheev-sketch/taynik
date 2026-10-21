@@ -9,10 +9,12 @@
     <p>Тайник — офлайн-менеджер паролей. База хранится локально
     в зашифрованном виде (AES-256-GCM, ключ выводится из мастер-пароля
     через Argon2id). Работает без сети, облака и телеметрии.</p>
-    <p>Возможности: генератор стойких паролей, TOTP-коды, история паролей,
-    поиск, фильтры по тегам и группам, цветовые метки, импорт/экспорт CSV,
-    копирование пароля с автоочисткой буфера обмена, автоввод с настраиваемой
-    последовательностью, резервное копирование базы.</p>
+    <p>Возможности: генератор стойких паролей и запоминаемых парольных фраз,
+    TOTP-коды с импортом ссылок otpauth://, история паролей, поиск, фильтры
+    по тегам и группам, цветовые метки, аудит безопасности, импорт/экспорт
+    CSV и зашифрованный экспорт .taynik, копирование пароля с автоочисткой
+    буфера обмена, автоввод с настраиваемой последовательностью,
+    резервное копирование базы.</p>
   </description>
   <launchable type="desktop-id">taynik.desktop</launchable>
   <metadata_license>CC0-1.0</metadata_license>
@@ -21,4 +23,66 @@
   <provides>
     <binary>taynik</binary>
   </provides>
+  <categories>
+    <category>Security</category>
+    <category>Utility</category>
+  </categories>
+  <keywords>
+    <keyword>password</keyword>
+    <keyword>пароль</keyword>
+    <keyword>vault</keyword>
+    <keyword>safe</keyword>
+    <keyword>сейф</keyword>
+  </keywords>
+  <url type="homepage">https://github.com/flytimopheev-sketch/taynik</url>
+  <url type="bugtracker">https://github.com/flytimopheev-sketch/taynik/issues</url>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/flytimopheev-sketch/taynik/main/docs/screenshots/main.png</image>
+      <caption>Главное окно со списком записей</caption>
+    </screenshot>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/flytimopheev-sketch/taynik/main/docs/screenshots/passphrase.png</image>
+      <caption>Генератор парольных фраз</caption>
+    </screenshot>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/flytimopheev-sketch/taynik/main/docs/screenshots/totp.png</image>
+      <caption>Код двухфакторной аутентификации</caption>
+    </screenshot>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/flytimopheev-sketch/taynik/main/docs/screenshots/audit.png</image>
+      <caption>Аудит безопасности</caption>
+    </screenshot>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/flytimopheev-sketch/taynik/main/docs/screenshots/dark-theme.png</image>
+      <caption>Тёмная тема оформления</caption>
+    </screenshot>
+  </screenshots>
+  <releases>
+    <release version="1.2.0" date="2026-10-21">
+      <description>
+        <p>Исправлена смена мастер-пароля: данные теперь перешифровываются
+        новым ключом. Добавлены генератор парольных фраз, аудит безопасности,
+        зашифрованный экспорт .taynik и импорт TOTP из ссылок otpauth://.
+        Каждое зашифрованное поле теперь привязано к своему имени (AAD).</p>
+      </description>
+    </release>
+    <release version="1.1.2" date="2026-09-14">
+      <description>
+        <p>Предпусковая диагностика автоввода и выбор xdotool/wtype по
+        XDG_SESSION_TYPE.</p>
+      </description>
+    </release>
+    <release version="1.1.0" date="2026-09-11">
+      <description>
+        <p>TOTP-коды, история паролей, группы и цветовые метки, настраиваемый
+        автоввод, импорт и экспорт CSV.</p>
+      </description>
+    </release>
+    <release version="1.0.0" date="2026-09-10">
+      <description>
+        <p>Первый публичный выпуск.</p>
+      </description>
+    </release>
+  </releases>
 </component>

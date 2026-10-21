@@ -38,14 +38,14 @@ impl Default for Config {
 fn config_path() -> PathBuf {
     let base = std::env::var("XDG_CONFIG_HOME")
         .map(PathBuf::from)
-        .unwrap_or_else(|_| {
-            dirs_home().join(".config")
-        });
+        .unwrap_or_else(|_| dirs_home().join(".config"));
     base.join("taynik").join("config.toml")
 }
 
 fn dirs_home() -> PathBuf {
-    std::env::var("HOME").map(PathBuf::from).unwrap_or_else(|_| PathBuf::from("/tmp"))
+    std::env::var("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("/tmp"))
 }
 
 impl Config {

@@ -1,8 +1,9 @@
 Name:           taynik
-Version:        1.1.2
+Version:        1.2.0
 Release:        1%{?dist}
 Summary:        Офлайн-менеджер паролей
 License:        MIT
+URL:            https://github.com/flytimopheev-sketch/taynik
 Source0:        %{name}-%{version}.tar.gz
 BuildRequires:  rust
 BuildRequires:  cargo
@@ -21,7 +22,9 @@ Recommends:     wtype
 Тайник — локальный GTK4-менеджер паролей. База хранится
 зашифрованной (AES-256-GCM, ключ из мастер-пароля через Argon2id).
 Работает полностью офлайн, без облака и телеметрии. Реализует
-автоввод логина/пароля в другие приложения (xdotool / wtype).
+автоввод логина/пароля в другие приложения (xdotool / wtype),
+TOTP-аутентификацию, генерацию парольных фраз, аудит стойкости
+паролей и зашифрованный экспорт данных.
 
 %prep
 %autosetup
@@ -74,13 +77,29 @@ install -Dm644 packaging/taynik.metainfo.xml %{buildroot}%{_metainfodir}/taynik.
 
 %files
 %license LICENSE
-%doc README.md
+%doc README.md CHANGELOG.md docs/ARCHITECTURE.md
 %{_bindir}/taynik
 %{_datadir}/applications/taynik.desktop
 %{_datadir}/icons/hicolor/scalable/apps/taynik.svg
 %{_metainfodir}/taynik.metainfo.xml
 
 %changelog
+* Tue Oct 21 2026 flytimopheev <flytimopheev@gmail.com> - 1.2.0-1
+- Исправлено: смена мастер-пароля больше не уничтожает данные — все записи
+  и история паролей перешифровываются новым ключом в одной транзакции.
+- Исправлено: тестовые векторы TOTP соответствуют RFC 2202/4231/6238;
+  добавлены векторы SHA-256 и 8 цифр.
+- Исправлено: ошибка шифрования больше не приводит к записи пустого блоба.
+- Исправлено: резервная копия создаётся через VACUUM INTO (согласованный
+  снимок), сохранение записи атомарно.
+- Исправлено: тема оформления больше не течёт, таймер TOTP завершается
+  вместе с диалогом, автоочистка буфера не обнуляет новый пароль.
+- Новое: привязка шифротекста к имени поля (AAD) — защита от подмены полей.
+- Новое: генератор парольных фраз (diceware, словарь 1024 слов).
+- Новое: аудит безопасности — слабые, повторяющиеся и устаревшие пароли.
+- Новое: зашифрованный экспорт/импорт в формате .taynik.
+- Новое: импорт TOTP из ссылки otpauth://, поддержка SHA-256 и 8 цифр.
+- Новое: фильтр «только избранное» и счётчик записей.
 * Mon Sep 14 2026 flytimopheev <flytimopheev@gmail.com> - 1.1.2-1
 - Автоввод: предпусковая диагностика — если вспомогательная утилита
   xdotool (X11) / wtype (Wayland) отсутствует, теперь показывается понятное

@@ -1,6 +1,16 @@
 //! Схема базы данных. Все чувствительные поля хранятся зашифрованными BLOB.
 
-pub const SCHEMA_VERSION: i64 = 2;
+/// Текущая версия схемы.
+///
+/// * v1 — базовые записи.
+/// * v2 — группы, цвета, TOTP-секреты, история паролей.
+/// * v3 — параметры TOTP (алгоритм/цифры/период) для импорта `otpauth://`.
+pub const SCHEMA_VERSION: i64 = 3;
+
+/// Формат шифрования полей.
+/// 1 — без привязки к имени поля (legacy), 2 — с AAD.
+pub const BLOB_FORMAT_LEGACY: u8 = 1;
+pub const BLOB_FORMAT_AAD: u8 = 2;
 
 /// Открытый текст, которым проверяется корректность мастер-пароля.
 pub const VERIFIER_PLAINTEXT: &str = "taynik-verifier-v1";
@@ -34,6 +44,7 @@ CREATE TABLE IF NOT EXISTS entries (
     entry_group BLOB,
     color BLOB,
     totp BLOB,
+    totp_params BLOB,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
 );
@@ -56,3 +67,6 @@ CREATE TABLE IF NOT EXISTS entry_history (
     changed_at INTEGER NOT NULL
 );
 ";
+
+/// Добавление столбца параметров TOTP (v3).
+pub const MIGRATE_V3: &str = "ALTER TABLE entries ADD COLUMN totp_params BLOB;";

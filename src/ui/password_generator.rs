@@ -6,10 +6,7 @@ use gtk4::prelude::*;
 use crate::models::generator::{self, GeneratorOptions, Strength};
 
 /// Показать генератор. `on_use` вызывается при нажатии «Использовать».
-pub fn show_generator(
-    parent: &impl IsA<gtk::Window>,
-    on_use: impl Fn(&str) + 'static,
-) {
+pub fn show_generator(parent: &impl IsA<gtk::Window>, on_use: impl Fn(&str) + 'static) {
     let dialog = gtk::Dialog::builder()
         .title("Генератор паролей")
         .modal(true)

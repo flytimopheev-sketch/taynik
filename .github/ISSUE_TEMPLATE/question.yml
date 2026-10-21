@@ -1,0 +1,21 @@
+name: Ошибка и предложение
+description: Задать вопрос или предложить улучшение
+title: ""
+labels: ["вопрос"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Вопрос или предложение
+      description: Опишите, что хотите узнать или изменить
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Версия приложения
+      description: Помощь → О программе
+      placeholder: "1.2.0"
+    validations:
+      required: false

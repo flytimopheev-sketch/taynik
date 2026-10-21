@@ -1,6 +1,8 @@
 /// Запись менеджера паролей (в памяти — всегда расшифрованная).
 use gtk4::glib;
 
+use super::totp::TotpParams;
+
 #[derive(Debug, Clone, Default)]
 pub struct Entry {
     pub id: Option<i64>,
@@ -17,6 +19,8 @@ pub struct Entry {
     pub color: String,
     /// TOTP-секрет в base32 (пусто — TOTP не задан).
     pub totp_secret: String,
+    /// Параметры генерации TOTP (алгоритм, число цифр, период).
+    pub totp_params: TotpParams,
     pub created_at: i64,
     pub updated_at: i64,
 }

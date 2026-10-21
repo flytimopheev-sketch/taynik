@@ -59,8 +59,7 @@ pub fn show(parent: &impl IsA<gtk::Window>, state: SharedState) {
         box_.append(&row);
     }
 
-    let lock_minimize =
-        gtk::CheckButton::with_label("Блокировать при сворачивании окна");
+    let lock_minimize = gtk::CheckButton::with_label("Блокировать при сворачивании окна");
     lock_minimize.set_active(cfg.lock_on_minimize);
     box_.append(&lock_minimize);
 

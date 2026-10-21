@@ -18,6 +18,15 @@ impl Strength {
             Strength::Strong => "Стойкий",
         }
     }
+
+    /// CSS-класс, соответствующий стойкости.
+    pub fn css_class(self) -> &'static str {
+        match self {
+            Strength::Weak => "error",
+            Strength::Medium => "warning",
+            Strength::Strong => "success",
+        }
+    }
 }
 
 /// Настройки генерации.
@@ -70,7 +79,13 @@ pub fn generate(opts: &GeneratorOptions) -> Result<String, String> {
     if !(8..=64).contains(&opts.length) {
         return Err("Длина пароля должна быть от 8 до 64 символов".into());
     }
+    // Собираем наборы и сразу запоминаем позицию каждого, чтобы не считать
+    // индексы набора по флагам: такой подход ломался, если набор
+    // оказывался пустым после фильтрации.
     let mut sets: Vec<String> = Vec::new();
+    let mut digits_idx: Option<usize> = None;
+    let mut symbols_idx: Option<usize> = None;
+
     if opts.lowercase {
         sets.push(filter_set(LOWER, opts.exclude_similar));
     }
@@ -78,16 +93,19 @@ pub fn generate(opts: &GeneratorOptions) -> Result<String, String> {
         sets.push(filter_set(UPPER, opts.exclude_similar));
     }
     if opts.digits {
+        digits_idx = Some(sets.len());
         sets.push(filter_set(DIGITS, opts.exclude_similar));
     }
     if opts.symbols {
+        symbols_idx = Some(sets.len());
         sets.push(filter_set(SYMBOLS, false));
     }
     if sets.iter().all(|s| s.is_empty()) {
         return Err("Не выбран ни один набор символов".into());
     }
 
-    let required = opts.min_digits * opts.digits as usize + opts.min_symbols * opts.symbols as usize;
+    let required =
+        opts.min_digits * usize::from(opts.digits) + opts.min_symbols * usize::from(opts.symbols);
     if required > opts.length {
         return Err(format!(
             "Требуется минимум {required} цифр/спецсимволов, но длина пароля {}",
@@ -96,23 +114,27 @@ pub fn generate(opts: &GeneratorOptions) -> Result<String, String> {
     }
 
     let mut rng = rand::thread_rng();
+    // Важно: `chars().nth()` принимает номер символа, а не байта. Наборы
+    // символов ASCII, но полагаться на это нельзя — считаем явно.
     let mut pick = |set: &str| -> char {
-        set.chars().nth(rng.gen_range(0..set.len())).unwrap_or('a')
+        let count = set.chars().count();
+        if count == 0 {
+            return 'a';
+        }
+        set.chars().nth(rng.gen_range(0..count)).unwrap_or('a')
     };
 
     // Обязательные символы: сначала минимумы по цифрам/спецсимволам,
     // затем хотя бы по одному из каждого выбранного набора.
     let mut chars: Vec<char> = Vec::new();
-    if opts.digits {
-        let ds = &sets[opts.lowercase as usize + opts.uppercase as usize];
+    if let Some(i) = digits_idx {
         for _ in 0..opts.min_digits {
-            chars.push(pick(ds));
+            chars.push(pick(&sets[i]));
         }
     }
-    if opts.symbols {
-        let idx = opts.lowercase as usize + opts.uppercase as usize + opts.digits as usize;
+    if let Some(i) = symbols_idx {
         for _ in 0..opts.min_symbols {
-            chars.push(pick(&sets[idx]));
+            chars.push(pick(&sets[i]));
         }
     }
     for s in &sets {
@@ -164,5 +186,91 @@ pub fn strength(password: &str) -> Strength {
         Strength::Medium
     } else {
         Strength::Strong
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    fn opts() -> GeneratorOptions {
+        GeneratorOptions::default()
+    }
+
+    #[test]
+    fn respects_length_and_charset() {
+        for len in [8usize, 12, 20, 64] {
+            let mut o = opts();
+            o.length = len;
+            let p = generate(&o).unwrap();
+            assert_eq!(p.chars().count(), len);
+            assert!(p.chars().all(|c| {
+                c.is_ascii_alphanumeric() || "!@#$%^&*()-_=+[]{};:,.<>?/~".contains(c)
+            }));
+        }
+    }
+
+    #[test]
+    fn honours_minimum_digits_and_symbols() {
+        let mut o = opts();
+        o.length = 20;
+        o.min_digits = 5;
+        o.min_symbols = 4;
+        for _ in 0..50 {
+            let p = generate(&o).unwrap();
+            assert!(p.chars().filter(|c| c.is_ascii_digit()).count() >= 5);
+            assert!(p.chars().filter(|c| !c.is_ascii_alphanumeric()).count() >= 4);
+        }
+    }
+
+    #[test]
+    fn excludes_similar_characters() {
+        let mut o = opts();
+        o.exclude_similar = true;
+        for _ in 0..50 {
+            let p = generate(&o).unwrap();
+            assert!(!p.chars().any(|c| SIMILAR.contains(c)), "{p}");
+        }
+    }
+
+    #[test]
+    fn rejects_impossible_settings() {
+        let mut o = opts();
+        o.length = 4;
+        assert!(generate(&o).is_err());
+
+        let mut o = opts();
+        o.length = 8;
+        o.min_digits = 7;
+        o.min_symbols = 7;
+        assert!(generate(&o).is_err());
+
+        let mut o = opts();
+        o.lowercase = false;
+        o.uppercase = false;
+        o.digits = false;
+        o.symbols = false;
+        assert!(generate(&o).is_err());
+    }
+
+    #[test]
+    fn generates_distinct_passwords() {
+        let o = opts();
+        let mut seen = HashSet::new();
+        for _ in 0..200 {
+            assert!(seen.insert(generate(&o).unwrap()));
+        }
+    }
+
+    #[test]
+    fn strength_levels() {
+        assert_eq!(strength("abc"), Strength::Weak);
+        // 11 строчных букв ≈ 52 бита — нижняя граница «среднего».
+        assert_eq!(strength("abcdefghijk"), Strength::Medium);
+        // 18 строчных букв ≈ 85 бит — надёжно.
+        assert_eq!(strength("abcdefghijklmnopqr"), Strength::Strong);
+        assert_eq!(strength("Xk9$mQ2#vLp7@rTn4%wYz8&"), Strength::Strong);
+        assert_eq!(strength(""), Strength::Weak);
     }
 }

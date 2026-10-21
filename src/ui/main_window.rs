@@ -44,6 +44,8 @@ pub struct MainWindow {
     search: gtk::SearchEntry,
     tag_dd: gtk::DropDown,
     group_dd: gtk::DropDown,
+    fav_only_cb: gtk::CheckButton,
+    count_l: gtk::Label,
     list: gtk::ListBox,
     toast: gtk::Revealer,
     toast_label: gtk::Label,
@@ -55,6 +57,7 @@ pub struct MainWindow {
     tags_e: gtk::Entry,
     group_e: gtk::Entry,
     totp_e: gtk::Entry,
+    totp_params: Cell<totp::TotpParams>,
     color_dd: gtk::DropDown,
     notes_buf: gtk::TextBuffer,
     fav_cb: gtk::CheckButton,
@@ -63,6 +66,10 @@ pub struct MainWindow {
     last_activity: Rc<Cell<i64>>,
     /// Защита от повторной блокировки (иначе открывается второе окно).
     locked: Cell<bool>,
+    /// Подавляет загрузку записи при перестроении списка.
+    suppress_selection: Cell<bool>,
+    /// Таймер автоочистки буфера обмена (предыдущий отменяется новым).
+    clipboard_timer: Rc<RefCell<Option<glib::SourceId>>>,
 }
 impl MainWindow {
     pub fn new(parent: &gtk::Window, state: SharedState) -> Rc<MainWindow> {
@@ -70,17 +77,14 @@ impl MainWindow {
 
         let window = gtk::Window::builder()
             .title("Тайник")
-            .default_width(1000)
-            .default_height(640)
+            .default_width(1100)
+            .default_height(780)
             .build();
         if let Some(app) = &app {
             window.set_application(Some(app));
         }
 
-        let color_items: Vec<&str> = COLOR_PALETTE
-            .iter()
-            .map(|(_, name)| *name)
-            .collect();
+        let color_items: Vec<&str> = COLOR_PALETTE.iter().map(|(_, name)| *name).collect();
 
         let tag_items: Vec<&str> = vec!["Все теги"];
         let group_items: Vec<&str> = vec!["Все группы"];
@@ -93,6 +97,8 @@ impl MainWindow {
             search: gtk::SearchEntry::new(),
             tag_dd: gtk::DropDown::from_strings(&tag_items),
             group_dd: gtk::DropDown::from_strings(&group_items),
+            fav_only_cb: gtk::CheckButton::with_label("Только избранное"),
+            count_l: gtk::Label::new(None),
             list: gtk::ListBox::new(),
             toast: gtk::Revealer::builder()
                 .transition_type(gtk::RevealerTransitionType::SlideDown)
@@ -108,6 +114,7 @@ impl MainWindow {
             tags_e: gtk::Entry::new(),
             group_e: gtk::Entry::new(),
             totp_e: gtk::Entry::new(),
+            totp_params: Cell::new(totp::TotpParams::default()),
             color_dd: gtk::DropDown::from_strings(&color_items),
             notes_buf: gtk::TextBuffer::new(None),
             fav_cb: gtk::CheckButton::with_label("Избранное"),
@@ -115,6 +122,8 @@ impl MainWindow {
             updated_l: gtk::Label::new(None),
             last_activity: Rc::new(Cell::new(glib::monotonic_time())),
             locked: Cell::new(false),
+            suppress_selection: Cell::new(false),
+            clipboard_timer: Rc::new(RefCell::new(None)),
         });
 
         m.setup_header();
@@ -136,9 +145,7 @@ impl MainWindow {
         // из обработчика сигнала) — откладываем.
         glib::idle_add_local_once({
             let parent = parent.clone();
-            move || {
-                parent.destroy()
-            }
+            move || parent.destroy()
         });
         m
     }
@@ -167,6 +174,14 @@ impl MainWindow {
         file_menu.append(Some("Создать резервную копию…"), Some("win.backup"));
         file_menu.append(Some("Экспорт в CSV…"), Some("win.export-csv"));
         file_menu.append(Some("Импорт из CSV…"), Some("win.import-csv"));
+        file_menu.append(
+            Some("Экспорт в зашифрованный файл…"),
+            Some("win.export-encrypted"),
+        );
+        file_menu.append(
+            Some("Импорт из зашифрованного файла…"),
+            Some("win.import-encrypted"),
+        );
         file_menu.append(Some("Заблокировать"), Some("win.lock"));
         file_menu.append(Some("Настройки…"), Some("win.settings"));
         file_menu.append(Some("Выход"), Some("win.quit"));
@@ -180,7 +195,12 @@ impl MainWindow {
 
         let view_menu = gio::Menu::new();
         view_menu.append(Some("Сортировать по названию"), Some("win.sort-title"));
-        view_menu.append(Some("Сортировать по дате изменения"), Some("win.sort-updated"));
+        view_menu.append(
+            Some("Сортировать по дате изменения"),
+            Some("win.sort-updated"),
+        );
+        view_menu.append(Some("Только избранное"), Some("win.favorites-only"));
+        view_menu.append(Some("Аудит безопасности…"), Some("win.audit"));
 
         let theme_menu = gio::Menu::new();
         for t in super::theme::THEMES {
@@ -203,7 +223,8 @@ impl MainWindow {
     fn setup_actions(self: &Rc<Self>, app: &Option<gtk::Application>) {
         let group = gio::SimpleActionGroup::new();
         let m = self.clone();
-        let add = |name: &str, f: Box<dyn Fn(&Rc<MainWindow>)>| {
+        type Action = Box<dyn Fn(&Rc<MainWindow>)>;
+        let add = |name: &str, f: Action| {
             let action = gio::SimpleAction::new(name, None);
             let mm = m.clone();
             action.connect_activate(move |_, _| f(&mm));
@@ -217,71 +238,105 @@ impl MainWindow {
         add("copy-login", Box::new(|m| m.copy_login()));
         add("copy-password", Box::new(|m| m.copy_password()));
         add("history", Box::new(|m| m.show_password_history()));
-        add("settings", Box::new(|m| {
-            super::settings_dialog::show(&m.window, m.state.clone());
-        }));
+        add(
+            "settings",
+            Box::new(|m| {
+                super::settings_dialog::show(&m.window, m.state.clone());
+            }),
+        );
         add("export-csv", Box::new(|m| m.export_csv_ui()));
         add("import-csv", Box::new(|m| m.import_csv_ui()));
-        add("create-db", Box::new(|m| {
-            super::create_db_dialog::show_create(&m.window, m.state.clone());
-        }));
-        add("open-db", Box::new(|m| {
-            let chooser = gtk::FileChooserNative::builder()
-                .title("Открыть базу")
-                .action(gtk::FileChooserAction::Open)
-                .modal(true)
-                .transient_for(&m.window)
-                .build();
-            let filter = gtk::FileFilter::new();
-            filter.set_name(Some("База Тайник (*.rpwm)"));
-            filter.add_pattern("*.rpwm");
-            chooser.add_filter(&filter);
-            let win = m.window.clone();
-            let state = m.state.clone();
-            chooser.connect_response(move |c, resp| {
-                if resp == gtk::ResponseType::Accept {
-                    if let Some(path) = c.file().and_then(|f| f.path()) {
-                        prompt_unlock_and_open(&win, &state, path);
+        add("export-encrypted", Box::new(|m| m.export_encrypted_ui()));
+        add("import-encrypted", Box::new(|m| m.import_encrypted_ui()));
+        add("audit", Box::new(|m| m.show_audit()));
+        add(
+            "favorites-only",
+            Box::new(|m| {
+                m.fav_only_cb.set_active(!m.fav_only_cb.is_active());
+            }),
+        );
+        add("generate-passphrase", Box::new(|m| m.generate_passphrase()));
+        add(
+            "create-db",
+            Box::new(|m| {
+                super::create_db_dialog::show_create(&m.window, m.state.clone());
+            }),
+        );
+        add(
+            "open-db",
+            Box::new(|m| {
+                let chooser = gtk::FileChooserNative::builder()
+                    .title("Открыть базу")
+                    .action(gtk::FileChooserAction::Open)
+                    .modal(true)
+                    .transient_for(&m.window)
+                    .build();
+                let filter = gtk::FileFilter::new();
+                filter.set_name(Some("База Тайник (*.rpwm)"));
+                filter.add_pattern("*.rpwm");
+                chooser.add_filter(&filter);
+                let win = m.window.clone();
+                let state = m.state.clone();
+                chooser.connect_response(move |c, resp| {
+                    if resp == gtk::ResponseType::Accept {
+                        if let Some(path) = c.file().and_then(|f| f.path()) {
+                            prompt_unlock_and_open(&win, &state, path);
+                        }
                     }
-                }
-                c.destroy();
-            });
-            chooser.show();
-        }));
-        add("change-password", Box::new(|m| {
-            m.show_change_password();
-        }));
+                    c.destroy();
+                });
+                chooser.show();
+            }),
+        );
+        add(
+            "change-password",
+            Box::new(|m| {
+                m.show_change_password();
+            }),
+        );
         add("backup", Box::new(|m| m.backup()));
-        add("sort-title", Box::new(|m| {
-            m.sort_mode.set(SortMode::Title);
-            m.apply_filter();
-        }));
-        add("sort-updated", Box::new(|m| {
-            m.sort_mode.set(SortMode::Updated);
-            m.apply_filter();
-        }));
-        add("about", Box::new(|m| {
-            gtk::AboutDialog::builder()
-                .title("О программе")
-                .program_name("Тайник")
-                .version(env!("CARGO_PKG_VERSION"))
-                .comments("Офлайн-менеджер паролей с автовводом, TOTP и темами оформления")
-                .copyright("© 2026 flytimopheev@gmail.com")
-                .authors(vec!["flytimopheev@gmail.com".to_string()])
-                .license_type(gtk::License::MitX11)
-                .modal(true)
-                .transient_for(&m.window)
-                .build()
-                .show();
-        }));
-        add("focus-search", Box::new(|m| {
-            m.search.grab_focus();
-        }));
+        add(
+            "sort-title",
+            Box::new(|m| {
+                m.sort_mode.set(SortMode::Title);
+                m.apply_filter();
+            }),
+        );
+        add(
+            "sort-updated",
+            Box::new(|m| {
+                m.sort_mode.set(SortMode::Updated);
+                m.apply_filter();
+            }),
+        );
+        add(
+            "about",
+            Box::new(|m| {
+                gtk::AboutDialog::builder()
+                    .title("О программе")
+                    .program_name("Тайник")
+                    .version(env!("CARGO_PKG_VERSION"))
+                    .comments("Офлайн-менеджер паролей с автовводом, TOTP и темами оформления")
+                    .copyright("© 2026 flytimopheev@gmail.com")
+                    .authors(vec!["flytimopheev@gmail.com".to_string()])
+                    .license_type(gtk::License::MitX11)
+                    .modal(true)
+                    .transient_for(&m.window)
+                    .build()
+                    .show();
+            }),
+        );
+        add(
+            "focus-search",
+            Box::new(|m| {
+                m.search.grab_focus();
+            }),
+        );
         // Переключение темы оформления (Вид → Тема оформления).
         let theme = self.state.config.borrow().theme.clone();
         let theme_action = gio::SimpleAction::new_stateful(
             "theme",
-            Some(&glib::VariantTy::STRING),
+            Some(glib::VariantTy::STRING),
             &glib::Variant::from(theme.as_str()),
         );
         {
@@ -328,7 +383,8 @@ impl MainWindow {
             .build();
         search_row.append(&gtk::Label::with_mnemonic("Поиск:"));
         self.search.set_hexpand(true);
-        self.search.set_placeholder_text(Some("Название, логин, URL, теги…"));
+        self.search
+            .set_placeholder_text(Some("Название, логин, URL, теги…"));
         search_row.append(&self.search);
         search_row.append(&gtk::Label::with_mnemonic("Теги:"));
         self.tag_dd.set_tooltip_text(Some("Фильтр по тегу"));
@@ -336,6 +392,11 @@ impl MainWindow {
         search_row.append(&gtk::Label::with_mnemonic("Группы:"));
         self.group_dd.set_tooltip_text(Some("Фильтр по группе"));
         search_row.append(&self.group_dd);
+        self.fav_only_cb
+            .set_tooltip_text(Some("Показывать только избранные записи"));
+        search_row.append(&self.fav_only_cb);
+        self.count_l.set_css_classes(&["dim-label"]);
+        search_row.append(&self.count_l);
 
         // --- Левая часть: список записей ---
         let left_scroll = gtk::ScrolledWindow::builder()
@@ -356,7 +417,14 @@ impl MainWindow {
             .margin_end(12)
             .build();
 
-        for w in [&self.title_e, &self.username_e, &self.url_e, &self.tags_e, &self.group_e, &self.totp_e] {
+        for w in [
+            &self.title_e,
+            &self.username_e,
+            &self.url_e,
+            &self.tags_e,
+            &self.group_e,
+            &self.totp_e,
+        ] {
             w.set_hexpand(true);
         }
         self.password_e.set_hexpand(true);
@@ -365,11 +433,29 @@ impl MainWindow {
         Self::add_form_row(&form, 2, "Пароль:", &self.password_e);
         Self::add_form_row(&form, 3, "URL:", &self.url_e);
         Self::add_form_row(&form, 4, "Теги:", &self.tags_e);
-        self.tags_e.set_tooltip_text(Some("Разделяйте теги запятыми"));
+        self.tags_e
+            .set_tooltip_text(Some("Разделяйте теги запятыми"));
         Self::add_form_row(&form, 5, "Группа:", &self.group_e);
-        self.group_e.set_tooltip_text(Some("Группа (папка) для фильтрации записей"));
-        Self::add_form_row(&form, 6, "TOTP-секрет:", &self.totp_e);
-        self.totp_e.set_tooltip_text(Some("Секрет TOTP в base32 (двухфакторный код)"));
+        self.group_e
+            .set_tooltip_text(Some("Группа (папка) для фильтрации записей"));
+        // TOTP-секрет + импорт из ссылки otpauth://.
+        let btn_otpauth = gtk::Button::with_label("Из ссылки…");
+        btn_otpauth.set_tooltip_text(Some("Импортировать TOTP-секрет из ссылки otpauth://"));
+        {
+            let l = gtk::Label::with_mnemonic("TOTP-секрет:");
+            l.set_halign(gtk::Align::Start);
+            form.attach(&l, 0, 6, 1, 1);
+            let row = gtk::Box::builder()
+                .orientation(gtk::Orientation::Horizontal)
+                .spacing(8)
+                .build();
+            self.totp_e.set_hexpand(true);
+            row.append(&self.totp_e);
+            row.append(&btn_otpauth);
+            form.attach(&row, 1, 6, 1, 1);
+        }
+        self.totp_e
+            .set_tooltip_text(Some("Секрет TOTP в base32 (двухфакторный код)"));
         // Цветовая метка.
         {
             let l = gtk::Label::with_mnemonic("Цвет:");
@@ -378,7 +464,10 @@ impl MainWindow {
             form.attach(&self.color_dd, 1, 7, 1, 1);
         }
 
-        form.attach(&gtk::Label::new(Some("Заметки:")), 0, 8, 1, 1);
+        let notes_label = gtk::Label::new(Some("Заметки:"));
+        notes_label.set_halign(gtk::Align::Start);
+        notes_label.set_valign(gtk::Align::Start);
+        form.attach(&notes_label, 0, 8, 1, 1);
         let notes = gtk::TextView::with_buffer(&self.notes_buf);
         notes.set_hexpand(true);
         notes.set_vexpand(true);
@@ -400,14 +489,15 @@ impl MainWindow {
             .selection_mode(gtk::SelectionMode::None)
             .activate_on_single_click(false)
             .min_children_per_line(2)
-            .max_children_per_line(3)
+            .max_children_per_line(5)
             .homogeneous(true)
             .column_spacing(8)
             .row_spacing(8)
-            .margin_top(8)
             .hexpand(true)
             .build();
         let btn_gen = gtk::Button::with_label("Сгенерировать");
+        let btn_gen_phrase = gtk::Button::with_label("Сгенерировать фразу");
+        btn_gen_phrase.set_tooltip_text(Some("Сгенерировать запоминаемую парольную фразу из слов"));
         let btn_copy = gtk::Button::with_label("Копировать пароль");
         let btn_copy_login = gtk::Button::with_label("Копировать логин");
         let btn_open_url = gtk::Button::with_label("Открыть URL");
@@ -422,6 +512,7 @@ impl MainWindow {
         btn_totp.set_tooltip_text(Some("Показать текущий TOTP-код"));
         for b in [
             &btn_gen,
+            &btn_gen_phrase,
             &btn_copy,
             &btn_copy_login,
             &btn_open_url,
@@ -433,13 +524,23 @@ impl MainWindow {
         ] {
             b.set_hexpand(true);
         }
-        for b in [&btn_gen, &btn_copy, &btn_copy_login, &btn_open_url, &btn_totp, &btn_autotype, &btn_save, &btn_cancel, &btn_delete] {
+        for b in [
+            &btn_gen,
+            &btn_gen_phrase,
+            &btn_copy,
+            &btn_copy_login,
+            &btn_open_url,
+            &btn_totp,
+            &btn_autotype,
+            &btn_save,
+            &btn_cancel,
+            &btn_delete,
+        ] {
             btns.insert(b, -1);
         }
-        // Индикатор стойкости пароля (обновляется в update_strength).
+        // Индикатор стойкости пароля размещается в нижней панели действий
+        // (обновляется в update_strength).
         self.strength_l.set_halign(gtk::Align::Start);
-        form.attach(&self.strength_l, 1, 11, 1, 1);
-        form.attach(&btns, 1, 12, 1, 1);
 
         // --- Компоновка панелей ---
         let details_scroll = gtk::ScrolledWindow::builder()
@@ -454,8 +555,28 @@ impl MainWindow {
             .vexpand(true)
             .build();
 
-        let root = gtk::Box::builder().orientation(gtk::Orientation::Vertical).build();
+        let root = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .build();
         root.append(&search_row);
+        root.append(&paned);
+
+        // Панель действий вынесена из прокручиваемой формы: кнопки
+        // «Сохранить» и «Удалить» должны быть видны всегда, иначе на
+        // невысоком окне они уходили под нижний край.
+        {
+            let footer = gtk::Box::builder()
+                .orientation(gtk::Orientation::Vertical)
+                .spacing(4)
+                .margin_top(6)
+                .margin_bottom(8)
+                .margin_start(12)
+                .margin_end(12)
+                .build();
+            footer.append(&self.strength_l);
+            footer.append(&btns);
+            root.append(&footer);
+        }
 
         // Встраиваемое уведомление (замена gtk::ToastOverlay для GTK < 4.10).
         {
@@ -470,8 +591,6 @@ impl MainWindow {
             self.toast.set_child(Some(&notif));
         }
 
-        root.append(&paned);
-
         overlay.set_child(Some(&root));
         overlay.add_overlay(&self.toast);
         self.toast.set_halign(gtk::Align::Fill);
@@ -479,6 +598,8 @@ impl MainWindow {
 
         self.connect_signals(
             btn_gen,
+            btn_gen_phrase,
+            btn_otpauth,
             btn_copy,
             btn_copy_login,
             btn_open_url,
@@ -499,9 +620,12 @@ impl MainWindow {
         f
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn connect_signals(
         self: &Rc<Self>,
         btn_gen: gtk::Button,
+        btn_gen_phrase: gtk::Button,
+        btn_otpauth: gtk::Button,
         btn_copy: gtk::Button,
         btn_copy_login: gtk::Button,
         btn_open_url: gtk::Button,
@@ -513,15 +637,22 @@ impl MainWindow {
     ) {
         {
             let m = self.clone();
-            self.search.connect_search_changed(move |_| m.apply_filter());
+            self.search
+                .connect_search_changed(move |_| m.apply_filter());
         }
         {
             let m = self.clone();
-            self.tag_dd.connect_selected_notify(move |_| m.apply_filter());
+            self.tag_dd
+                .connect_selected_notify(move |_| m.apply_filter());
         }
         {
             let m = self.clone();
-            self.group_dd.connect_selected_notify(move |_| m.apply_filter());
+            self.group_dd
+                .connect_selected_notify(move |_| m.apply_filter());
+        }
+        {
+            let m = self.clone();
+            self.fav_only_cb.connect_toggled(move |_| m.apply_filter());
         }
         {
             let m = self.clone();
@@ -533,8 +664,26 @@ impl MainWindow {
             });
         }
         {
+            // Выделение строки сразу показывает запись в форме — иначе
+            // пришлось бы открывать каждую запись двойным щелчком.
             let m = self.clone();
-            self.password_e.connect_changed(move |_| m.update_strength());
+            self.list.connect_row_selected(move |_, row| {
+                if m.suppress_selection.get() {
+                    return;
+                }
+                let Some(row) = row else {
+                    return;
+                };
+                let idx = row.index();
+                if let Some(id) = m.row_ids.borrow().get(idx as usize).copied() {
+                    m.load_entry(id);
+                }
+            });
+        }
+        {
+            let m = self.clone();
+            self.password_e
+                .connect_changed(move |_| m.update_strength());
         }
         {
             let m = self.clone();
@@ -544,6 +693,14 @@ impl MainWindow {
                     pass_e.set_text(pass);
                 });
             });
+        }
+        {
+            let m = self.clone();
+            btn_gen_phrase.connect_clicked(move |_| m.generate_passphrase());
+        }
+        {
+            let m = self.clone();
+            btn_otpauth.connect_clicked(move |_| m.import_otpauth());
         }
         {
             let m = self.clone();
@@ -635,7 +792,16 @@ impl MainWindow {
     /// Загрузить записи из базы и обновить список.
     pub fn refresh(self: &Rc<Self>) {
         let entries = match self.state.db.borrow().as_ref() {
-            Some(db) => db.list_entries().unwrap_or_default(),
+            Some(db) => match db.list_entries() {
+                Ok(v) => v,
+                Err(e) => {
+                    show_error(
+                        &self.window,
+                        &format!("Не удалось прочитать записи из базы:\n{e}"),
+                    );
+                    Vec::new()
+                }
+            },
             None => Vec::new(),
         };
         self.entries.replace(entries);
@@ -696,13 +862,15 @@ impl MainWindow {
             .map(|s| s.string().to_string())
             .unwrap_or_else(|| "Все группы".into());
 
+        let fav_only = self.fav_only_cb.is_active();
         let mut filtered: Vec<Entry> = self
             .entries
             .borrow()
             .iter()
             .filter(|e| {
-                let tag_ok = tag == "Все теги" || e.tags.iter().any(|t| *t == tag);
+                let tag_ok = tag == "Все теги" || e.tags.contains(&tag);
                 let group_ok = group == "Все группы" || e.group.trim() == group;
+                let fav_ok = !fav_only || e.favorite;
                 let q = &query;
                 let text_ok = q.is_empty()
                     || e.title.to_lowercase().contains(q.as_str())
@@ -710,15 +878,25 @@ impl MainWindow {
                     || e.url.to_lowercase().contains(q.as_str())
                     || e.group.to_lowercase().contains(q.as_str())
                     || e.tags.iter().any(|t| t.to_lowercase().contains(q.as_str()));
-                tag_ok && group_ok && text_ok
+                tag_ok && group_ok && fav_ok && text_ok
             })
             .cloned()
             .collect();
 
         match self.sort_mode.get() {
-            SortMode::Title => filtered.sort_by(|a, b| a.title.to_lowercase().cmp(&b.title.to_lowercase())),
-            SortMode::Updated => filtered.sort_by(|a, b| b.updated_at.cmp(&a.updated_at)),
+            SortMode::Title => filtered.sort_by_key(|a| a.title.to_lowercase()),
+            SortMode::Updated => filtered.sort_by_key(|a| std::cmp::Reverse(a.updated_at)),
         }
+
+        let total = self.entries.borrow().len();
+        self.count_l.set_text(&format!(
+            "Записей: {total}{}",
+            if filtered.len() != total {
+                format!(" (показано {})", filtered.len())
+            } else {
+                String::new()
+            }
+        ));
 
         while let Some(row) = self.list.row_at_index(0) {
             self.list.remove(&row);
@@ -726,16 +904,16 @@ impl MainWindow {
         // Очищаем соответствие строк и id записей перед повторным заполнением,
         // иначе клик по строке после фильтрации откроет чужую запись.
         self.row_ids.borrow_mut().clear();
+        // Перестроение списка вызывает сигналы выделения — пока они идут,
+        // загружать запись нельзя (id ещё не соответствуют строкам).
+        self.suppress_selection.set(true);
         for e in &filtered {
             let star = if e.favorite { "★ " } else { "" };
             let esc = glib::markup_escape_text(&e.title).to_string();
             let markup = if e.color.is_empty() {
                 format!("{star}{esc}")
             } else {
-                format!(
-                    "<span foreground=\"{}\">●</span> {star}{esc}",
-                    e.color
-                )
+                format!("<span foreground=\"{}\">●</span> {star}{esc}", e.color)
             };
             let row = gtk::ListBoxRow::new();
             let label = gtk::Label::builder()
@@ -748,10 +926,16 @@ impl MainWindow {
             self.row_ids.borrow_mut().push(e.id.unwrap_or(-1));
             self.list.append(&row);
         }
+        self.suppress_selection.set(false);
     }
 
     fn load_entry(self: &Rc<Self>, id: i64) {
-        let entry = self.entries.borrow().iter().find(|e| e.id == Some(id)).cloned();
+        let entry = self
+            .entries
+            .borrow()
+            .iter()
+            .find(|e| e.id == Some(id))
+            .cloned();
         if let Some(e) = entry {
             self.edit_id.set(e.id);
             self.title_e.set_text(&e.title);
@@ -761,6 +945,7 @@ impl MainWindow {
             self.tags_e.set_text(&e.tags.join(", "));
             self.group_e.set_text(&e.group);
             self.totp_e.set_text(&e.totp_secret);
+            self.totp_params.set(e.totp_params);
             let color_idx = COLOR_PALETTE
                 .iter()
                 .position(|(hex, _)| *hex == e.color)
@@ -785,6 +970,7 @@ impl MainWindow {
         self.tags_e.set_text("");
         self.group_e.set_text("");
         self.totp_e.set_text("");
+        self.totp_params.set(totp::TotpParams::default());
         self.color_dd.set_selected(0);
         self.notes_buf.set_text("");
         self.fav_cb.set_active(false);
@@ -817,23 +1003,31 @@ impl MainWindow {
             url: self.url_e.text().to_string(),
             notes: self
                 .notes_buf
-                .text(&self.notes_buf.start_iter(), &self.notes_buf.end_iter(), true)
+                .text(
+                    &self.notes_buf.start_iter(),
+                    &self.notes_buf.end_iter(),
+                    true,
+                )
                 .to_string(),
             tags,
             favorite: self.fav_cb.is_active(),
             group: self.group_e.text().to_string(),
             color,
             totp_secret: self.totp_e.text().to_string(),
+            totp_params: self.totp_params.get(),
             created_at: 0,
             updated_at: 0,
         };
         // Если база не открыта (например, после блокировки) — не сообщаем
         // об успехе, а честно показываем ошибку.
-        let save_result = match self.state.db.borrow().as_ref() {
-            Some(db) => db.save_entry(&mut entry),
-            None => {
-                show_error(&self.window, "База не открыта — запись не сохранена.");
-                return;
+        let save_result = {
+            let mut guard = self.state.db.borrow_mut();
+            match guard.as_mut() {
+                Some(db) => db.save_entry(&mut entry),
+                None => {
+                    show_error(&self.window, "База не открыта — запись не сохранена.");
+                    return;
+                }
             }
         };
         if let Err(e) = save_result {
@@ -862,8 +1056,19 @@ impl MainWindow {
         let m = self.clone();
         dialog.connect_response(move |d, resp| {
             if resp == gtk::ResponseType::Yes {
-                if let Some(db) = m.state.db.borrow().as_ref() {
-                    let _ = db.delete_entry(id);
+                let res = {
+                    let mut guard = m.state.db.borrow_mut();
+                    match guard.as_mut() {
+                        Some(db) => db.delete_entry(id),
+                        None => {
+                            show_error(&m.window, "База не открыта.");
+                            d.destroy();
+                            return;
+                        }
+                    }
+                };
+                if let Err(e) = res {
+                    show_error(&m.window, &format!("Не удалось удалить запись:\n{e}"));
                 }
                 m.refresh();
             }
@@ -898,13 +1103,21 @@ impl MainWindow {
             self.toast_toast(&format!(
                 "Пароль скопирован, будет очищен через {secs} секунд"
             ));
+            // Прежний таймер отменяем: иначе он очистит буфер раньше времени,
+            // обнулив пароль, который скопировали позже.
+            if let Some(id) = self.clipboard_timer.borrow_mut().take() {
+                id.remove();
+            }
             let win = self.window.downgrade();
-            glib::timeout_add_seconds_local(secs as u32, move || {
+            let timer_cell = self.clipboard_timer.clone();
+            let id = glib::timeout_add_seconds_local(secs as u32, move || {
                 if let Some(w) = win.upgrade() {
                     w.clipboard().set_text("");
                 }
+                *timer_cell.borrow_mut() = None;
                 glib::ControlFlow::Break
             });
+            *self.clipboard_timer.borrow_mut() = Some(id);
         } else {
             self.toast_toast("Пароль скопирован (автоочистка буфера отключена)");
         }
@@ -941,6 +1154,7 @@ impl MainWindow {
             show_error(&self.window, "У записи не задан TOTP-секрет.");
             return;
         }
+        let params = self.totp_params.get();
         let dialog = gtk::Dialog::builder()
             .title("TOTP-код")
             .modal(true)
@@ -962,9 +1176,7 @@ impl MainWindow {
             .margin_start(20)
             .margin_end(20)
             .build();
-        let code_l = gtk::Label::builder()
-            .css_classes(vec!["title-1"])
-            .build();
+        let code_l = gtk::Label::builder().css_classes(vec!["title-1"]).build();
         let remain_l = gtk::Label::new(None);
         box_.append(&code_l);
         box_.append(&remain_l);
@@ -979,23 +1191,39 @@ impl MainWindow {
             });
         }
 
-        // Обновление кода раз в секунду.
-        glib::timeout_add_seconds_local(1, move || {
-            match totp::totp_now(secret.trim()) {
-                Ok((code, remain)) => {
-                    code_l.set_text(&code);
-                    remain_l.set_text(&format!("Обновится через {remain} с"));
-                    glib::ControlFlow::Continue
+        // Обновление кода раз в секунду. Таймер обязан завершаться вместе с
+        // диалогом — иначе он крутится до конца работы приложения.
+        let alive = std::rc::Rc::new(Cell::new(true));
+        {
+            let alive = alive.clone();
+            let code_l = code_l.clone();
+            let remain_l = remain_l.clone();
+            glib::timeout_add_seconds_local(1, move || {
+                if !alive.get() {
+                    return glib::ControlFlow::Break;
                 }
-                Err(e) => {
-                    code_l.set_text("—");
-                    remain_l.set_text(&e);
-                    glib::ControlFlow::Break
+                match totp::totp_now_with(secret.trim(), &params) {
+                    Ok((code, remain)) => {
+                        code_l.set_text(&code);
+                        remain_l.set_text(&format!("Обновится через {remain} с"));
+                        glib::ControlFlow::Continue
+                    }
+                    Err(e) => {
+                        code_l.set_text("—");
+                        remain_l.set_text(&e);
+                        glib::ControlFlow::Break
+                    }
                 }
-            }
-        });
+            });
+        }
 
-        dialog.connect_response(|d, _| d.destroy());
+        {
+            let alive = alive.clone();
+            dialog.connect_response(move |d, _| {
+                alive.set(false);
+                d.destroy();
+            });
+        }
         dialog.show();
     }
     /// История паролей выбранной записи: список, копирование и восстановление.
@@ -1031,9 +1259,13 @@ impl MainWindow {
         list.add_css_class("navigation-sidebar");
 
         if records.is_empty() {
-            list.append(&gtk::ListBoxRow::builder()
-                .child(&gtk::Label::new(Some("История пуста: меняйте пароль записи, чтобы он сохранялся.")))
-                .build());
+            list.append(
+                &gtk::ListBoxRow::builder()
+                    .child(&gtk::Label::new(Some(
+                        "История пуста: меняйте пароль записи, чтобы он сохранялся.",
+                    )))
+                    .build(),
+            );
         }
         for (ts, pass) in &records {
             let date = glib::DateTime::from_unix_local(*ts)
@@ -1050,7 +1282,7 @@ impl MainWindow {
                 .margin_end(8)
                 .build();
             let pass_l = gtk::Label::builder()
-                 .label(pass.as_str())
+                .label(pass.as_str())
                 .hexpand(true)
                 .halign(gtk::Align::Start)
                 .ellipsize(gtk::pango::EllipsizeMode::Middle)
@@ -1152,24 +1384,28 @@ impl MainWindow {
                     match io::import_csv(&path) {
                         Ok(entries) => {
                             let mut added = 0usize;
-                            let res = m.state.db.borrow().as_ref().map(|db| {
-                                for mut e in entries {
-                                    if e.title.trim().is_empty() || e.password.is_empty() {
-                                        continue;
-                                    }
-                                    if db.save_entry(&mut e).is_ok() {
-                                        added += 1;
+                            let mut errors = 0usize;
+                            {
+                                let mut guard = m.state.db.borrow_mut();
+                                if let Some(db) = guard.as_mut() {
+                                    for mut e in entries {
+                                        if e.title.trim().is_empty() || e.password.is_empty() {
+                                            errors += 1;
+                                            continue;
+                                        }
+                                        match db.save_entry(&mut e) {
+                                            Ok(()) => added += 1,
+                                            Err(_) => errors += 1,
+                                        }
                                     }
                                 }
-                                added
-                            });
-                            match res {
-                                Some(n) => {
-                                    m.toast_toast(&format!("Импортировано записей: {n}"));
-                                    m.refresh();
-                                }
-                                None => show_error(&m.window, "База не открыта."),
                             }
+                            m.refresh();
+                            let mut msg = format!("Импортировано записей: {added}");
+                            if errors > 0 {
+                                msg.push_str(&format!(" (пропущено: {errors})"));
+                            }
+                            m.toast_toast(&msg);
                         }
                         Err(e) => show_error(&m.window, &format!("Ошибка импорта:\n{e}")),
                     }
@@ -1271,7 +1507,10 @@ impl MainWindow {
                     return;
                 }
                 if n.len() < 8 {
-                    show_error(&m.window, "Новый пароль слишком короткий (минимум 8 символов).");
+                    show_error(
+                        &m.window,
+                        "Новый пароль слишком короткий (минимум 8 символов).",
+                    );
                     return;
                 }
                 let res = m
@@ -1308,11 +1547,237 @@ impl MainWindow {
         }
         let s = generator::strength(&pass);
         self.strength_l.set_text(s.label());
-        self.strength_l.set_css_classes(&match s {
-            generator::Strength::Weak => vec!["error"],
-            generator::Strength::Medium => vec!["warning"],
-            generator::Strength::Strong => vec!["success"],
+        self.strength_l.set_css_classes(&[s.css_class()]);
+    }
+
+    /// Экспорт записей в зашифрованный файл `.taynik`.
+    fn export_encrypted_ui(self: &Rc<Self>) {
+        let entries = match self.state.db.borrow().as_ref() {
+            Some(db) => match db.list_entries() {
+                Ok(v) => v,
+                Err(e) => {
+                    show_error(&self.window, &format!("Не удалось прочитать записи:\n{e}"));
+                    return;
+                }
+            },
+            None => {
+                show_error(&self.window, "База не открыта.");
+                return;
+            }
+        };
+        let entries = Rc::new(entries);
+        let chooser = gtk::FileChooserNative::builder()
+            .title("Экспорт в зашифрованный файл")
+            .action(gtk::FileChooserAction::Save)
+            .modal(true)
+            .transient_for(&self.window)
+            .build();
+        let filter = gtk::FileFilter::new();
+        filter.set_name(Some("Зашифрованный экспорт Тайника (*.taynik)"));
+        filter.add_pattern("*.taynik");
+        chooser.add_filter(&filter);
+        chooser.set_current_name("taynik-export.taynik");
+        let m = self.clone();
+        chooser.connect_response(move |c, resp| {
+            if resp == gtk::ResponseType::Accept {
+                if let Some(path) = c.file().and_then(|f| f.path()) {
+                    let entries = entries.clone();
+                    let win = m.window.clone();
+                    let m2 = m.clone();
+                    super::prompt_password(
+                        &win,
+                        "Пароль файла экспорта",
+                        "Введите пароль, которым будет зашифрован файл. \
+                         Его невозможно восстановить — сохраните его отдельно.",
+                        true,
+                        move |password| match crate::db::transfer::export(
+                            &path, &entries, &password,
+                        ) {
+                            Ok(n) => m2.toast_toast(&format!(
+                                "Экспортировано записей: {n} → {}",
+                                path.display()
+                            )),
+                            Err(e) => show_error(&m2.window, &format!("Ошибка экспорта:\n{e}")),
+                        },
+                    );
+                }
+            }
+            c.destroy();
         });
+        chooser.show();
+    }
+
+    /// Импорт записей из зашифрованного файла `.taynik`.
+    fn import_encrypted_ui(self: &Rc<Self>) {
+        let chooser = gtk::FileChooserNative::builder()
+            .title("Импорт из зашифрованного файла")
+            .action(gtk::FileChooserAction::Open)
+            .modal(true)
+            .transient_for(&self.window)
+            .build();
+        let filter = gtk::FileFilter::new();
+        filter.set_name(Some("Зашифрованный экспорт Тайника (*.taynik)"));
+        filter.add_pattern("*.taynik");
+        chooser.add_filter(&filter);
+        let m = self.clone();
+        chooser.connect_response(move |c, resp| {
+            if resp == gtk::ResponseType::Accept {
+                if let Some(path) = c.file().and_then(|f| f.path()) {
+                    let win = m.window.clone();
+                    let m2 = m.clone();
+                    super::prompt_password(
+                        &win,
+                        "Пароль файла экспорта",
+                        "Введите пароль, которым был зашифрован файл.",
+                        false,
+                        move |password| {
+                            let imported = match crate::db::transfer::import(&path, &password) {
+                                Ok(v) => v,
+                                Err(e) => {
+                                    show_error(
+                                        &m2.window,
+                                        &format!("Не удалось импортировать файл:\n{e}"),
+                                    );
+                                    return;
+                                }
+                            };
+                            let mut added = 0usize;
+                            let mut errors = 0usize;
+                            {
+                                let mut guard = m2.state.db.borrow_mut();
+                                if let Some(db) = guard.as_mut() {
+                                    for mut e in imported {
+                                        if e.title.trim().is_empty() || e.password.is_empty() {
+                                            errors += 1;
+                                            continue;
+                                        }
+                                        match db.save_entry(&mut e) {
+                                            Ok(()) => added += 1,
+                                            Err(_) => errors += 1,
+                                        }
+                                    }
+                                }
+                            }
+                            m2.refresh();
+                            let mut msg = format!("Импортировано записей: {added}");
+                            if errors > 0 {
+                                msg.push_str(&format!(" (пропущено: {errors})"));
+                            }
+                            m2.toast_toast(&msg);
+                        },
+                    );
+                }
+            }
+            c.destroy();
+        });
+        chooser.show();
+    }
+
+    /// Аудит безопасности базы: слабые, повторяющиеся и устаревшие пароли.
+    fn show_audit(self: &Rc<Self>) {
+        let entries = match self.state.db.borrow().as_ref() {
+            Some(db) => match db.list_entries() {
+                Ok(v) => v,
+                Err(e) => {
+                    show_error(&self.window, &format!("Не удалось прочитать записи:\n{e}"));
+                    return;
+                }
+            },
+            None => {
+                show_error(&self.window, "База не открыта.");
+                return;
+            }
+        };
+        let m = self.clone();
+        let on_open = Rc::new(move |id: i64| {
+            m.load_entry(id);
+            m.window.present();
+        });
+        super::audit_dialog::show(
+            &self.window,
+            &entries,
+            365,
+            crate::models::generator::Strength::Medium,
+            on_open,
+        );
+    }
+
+    /// Генератор парольных фраз: результат подставляется в поле пароля.
+    fn generate_passphrase(self: &Rc<Self>) {
+        let pass_e = self.password_e.clone();
+        super::passphrase_dialog::show_generator(&self.window, move |pass| {
+            pass_e.set_text(pass);
+        });
+    }
+
+    /// Импорт TOTP-секрета из ссылки `otpauth://`.
+    fn import_otpauth(self: &Rc<Self>) {
+        let dialog = gtk::Dialog::builder()
+            .title("Импорт TOTP из ссылки")
+            .modal(true)
+            .transient_for(&self.window)
+            .default_width(520)
+            .build();
+        dialog.add_button("Отмена", gtk::ResponseType::Cancel);
+        dialog.add_button("Импортировать", gtk::ResponseType::Ok);
+        dialog.set_default_response(gtk::ResponseType::Ok);
+
+        let content = dialog.content_area();
+        let box_ = gtk::Box::builder()
+            .orientation(gtk::Orientation::Vertical)
+            .spacing(10)
+            .margin_top(16)
+            .margin_bottom(16)
+            .margin_start(16)
+            .margin_end(16)
+            .build();
+        box_.append(&gtk::Label::new(Some(
+            "Вставьте ссылку вида otpauth://totp/Сервис:Логин?secret=…",
+        )));
+        let uri_e = gtk::Entry::builder()
+            .placeholder_text("otpauth://totp/...")
+            .hexpand(true)
+            .build();
+        box_.append(&uri_e);
+        content.append(&box_);
+
+        let m = self.clone();
+        let uri_for_response = uri_e.clone();
+        dialog.connect_response(move |d, resp| {
+            if resp == gtk::ResponseType::Ok {
+                let uri = uri_for_response.text().to_string();
+                match totp::parse_otpauth(&uri) {
+                    Ok(parsed) => {
+                        m.totp_e.set_text(&parsed.secret);
+                        m.totp_params.set(parsed.params);
+                        // Название и издатель подставляем, только если поле пустое.
+                        if m.title_e.text().is_empty() {
+                            let name = match (&parsed.issuer, &parsed.account) {
+                                (Some(i), Some(a)) => format!("{i} — {a}"),
+                                (None, Some(a)) => a.clone(),
+                                (Some(i), None) => i.clone(),
+                                (None, None) => String::new(),
+                            };
+                            m.title_e.set_text(&name);
+                        }
+                        m.toast_toast(&format!(
+                            "TOTP-секрет импортирован ({}, {} цифр, {} с)",
+                            parsed.params.algorithm.as_str(),
+                            parsed.params.digits,
+                            parsed.params.period
+                        ));
+                        d.destroy();
+                    }
+                    Err(e) => {
+                        show_error(&m.window, &format!("Не удалось разобрать ссылку:\n{e}"));
+                    }
+                }
+            } else {
+                d.destroy();
+            }
+        });
+        dialog.show();
+        uri_e.grab_focus();
     }
 
     fn toast_toast(self: &Rc<Self>, text: &str) {
